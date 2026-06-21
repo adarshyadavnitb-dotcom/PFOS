@@ -1,0 +1,65 @@
+keyword,category,need_or_want
+swiggy,Food & Dining,Want
+zomato,Food & Dining,Want
+restaurant,Food & Dining,Want
+cafe,Food & Dining,Want
+chai,Food & Dining,Want
+biryani,Food & Dining,Want
+pizza,Food & Dining,Want
+burger,Food & Dining,Want
+dominos,Food & Dining,Want
+mcdonalds,Food & Dining,Want
+starbucks,Food & Dining,Want
+uber eats,Food & Dining,Want
+grocery,Groceries,Need
+bigbasket,Groceries,Need
+blinkit,Groceries,Need
+zepto,Groceries,Need
+dmart,Groceries,Need
+vegetables,Groceries,Need
+fruits,Groceries,Need
+milk,Groceries,Need
+uber,Transport,Need
+ola,Transport,Need
+rapido,Transport,Need
+auto,Transport,Need
+metro,Transport,Need
+petrol,Transport,Need
+diesel,Transport,Need
+parking,Transport,Need
+toll,Transport,Need
+rent,Rent & Housing,Need
+maintenance,Rent & Housing,Need
+society,Rent & Housing,Need
+electricity,Utilities,Need
+water,Utilities,Need
+gas,Utilities,Need
+wifi,Utilities,Need
+internet,Utilities,Need
+amazon,Shopping,Want
+flipkart,Shopping,Want
+myntra,Shopping,Want
+ajio,Shopping,Want
+clothes,Shopping,Want
+shoes,Shopping,Want
+movie,Entertainment,Want
+netflix,Subscriptions,Want
+spotify,Subscriptions,Want
+youtube,Subscriptions,Want
+hotstar,Subscriptions,Want
+prime,Subscriptions,Want
+gym,Health & Medical,Need
+pharmacy,Health & Medical,Need
+doctor,Health & Medical,Need
+hospital,Health & Medical,Need
+medicine,Health & Medical,Need
+medplus,Health & Medical,Need
+apollo,Health & Medical,Need
+course,Education,Need
+udemy,Education,Need
+book,Education,Need
+haircut,Personal Care,Want
+salon,Personal Care,Want
+recharge,Recharge & Bills,Need
+airtel,Recharge & Bills,Need
+jio,Recharge & Bills,Need

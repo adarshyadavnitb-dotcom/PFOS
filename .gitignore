@@ -1,0 +1,11 @@
+# Logs and debug output
+logs/
+
+# Never commit real credentials or secrets
+n8n/credentials/*.json
+.env
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db

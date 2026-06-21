@@ -1,0 +1,16 @@
+category_name,default_need_want,monthly_budget,active
+Food & Dining,Want,,TRUE
+Groceries,Need,,TRUE
+Transport,Need,,TRUE
+Rent & Housing,Need,,TRUE
+Utilities,Need,,TRUE
+Shopping,Want,,TRUE
+Entertainment,Want,,TRUE
+Health & Medical,Need,,TRUE
+Education,Need,,TRUE
+Subscriptions,Want,,TRUE
+Personal Care,Want,,TRUE
+Gifts & Donations,Want,,TRUE
+Travel,Want,,TRUE
+Recharge & Bills,Need,,TRUE
+Miscellaneous,Want,,TRUE
