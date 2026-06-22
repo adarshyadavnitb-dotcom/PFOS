@@ -6,6 +6,9 @@ n8n/credentials/*.json
 .env
 *.env
 
+# Local n8n session/cookie artifacts
+n8n_cookies
+
 # OS files
 .DS_Store
 Thumbs.db
