@@ -1,118 +1,163 @@
-# PFOS v4 — Personal Finance Operating System
+# PFOS — Personal Finance Operating System
 
-A personal expense tracking system that lets you log expenses via Telegram and automatically categorizes and stores them in Google Sheets. Built as a phased project that starts simple (no AI) and progressively adds intelligence.
+> Log an expense by texting your own Telegram bot. It parses, categorizes, and stores it in Google Sheets, replies in seconds, and sends you an automatic daily summary every evening.
 
-## How It Works (The Simple Version)
+![Status](https://img.shields.io/badge/Phase%201-Live-brightgreen)
+![Stack](https://img.shields.io/badge/stack-Telegram%20%2B%20n8n%20%2B%20Sheets-blue)
+![Tests](https://img.shields.io/badge/Phase%201%20logic%20tests-40%2F40-success)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+---
+
+## Why I built this
+
+I wanted a frictionless way to track spending — no app to open, no form to fill, just a text message. But I also designed it deliberately as a **case study in building reliable automation**: schema-first data design, composable workflows, cost-aware AI, and an audit trail on every machine-generated value.
+
+The build is **phased on purpose** — prove the plumbing works with simple rules before adding any AI, then layer intelligence on a foundation that's already trustworthy.
 
 ```
-You send "450 Swiggy" on Telegram
-        |
-        v
-n8n receives it, extracts the amount and merchant
-        |
-        v
-Looks up the category ("Food & Dining") from a keyword list
-        |
-        v
-Writes a row to Google Sheets
-        |
-        v
-Sends you back: "₹450 logged under Food & Dining (Want)"
+You text:  "450 swiggy"
+              │
+              ▼
+   ✅ ₹450 logged under Food & Dining (Want)
+              │
+   ┌──────────┴───────────┐
+   │  ...and every 9 PM:   │
+   │  📊 Daily Summary     │
+   │  💰 Total: ₹1,250     │
+   │  🏆 Top: Food & Dining│
+   └──────────────────────┘
 ```
 
-Every evening at 9 PM, a separate job runs that summarizes your day's spending and sends it to you on Telegram.
+---
 
-## Tech Stack
+## Architecture
 
-| Tool | Role | Why |
+A clean 4-layer separation — each layer can be explained, demoed, and swapped independently.
+
+```
+┌─────────────────────────────────────────────┐
+│ CAPTURE        Telegram bot (text)           │
+└───────────────────────┬─────────────────────┘
+                        │ webhook
+┌───────────────────────▼─────────────────────┐
+│ ORCHESTRATION  n8n (Docker)                  │
+│ webhook + scheduled triggers, routing, errors│
+└──────────┬─────────────────────┬─────────────┘
+           │                     │
+┌──────────▼────────┐  ┌─────────▼────────────┐
+│ INTELLIGENCE      │  │ PERSISTENCE          │
+│ Gemini (Phase 2+) │◄►│ Google Sheets (DB)   │
+└───────────────────┘  └──────────────────────┘
+```
+
+> **The mental model:** n8n is the *nervous system*, Gemini is the *brain*, Sheets is the *memory*, Telegram is the *mouth and ears*.
+
+| Tool | Role | Why this choice |
 |---|---|---|
-| **Telegram** | Input & output | You already use it daily — zero friction |
-| **n8n** | Workflow automation | Runs in Docker, visual editor, free & self-hosted |
-| **Google Sheets** | Database | Simple, visible, easy to debug and share |
-| **Gemini API** | AI (Phase 2+) | Categorization, insights, coaching — added later |
+| **Telegram** | Input & output | Already used daily — zero adoption friction |
+| **n8n** | Orchestration | Self-hosted, visual, free, easy to demo |
+| **Google Sheets** | Database | Transparent, debuggable, shareable |
+| **Gemini API** | Intelligence (Phase 2+) | Categorization, insights, coaching |
 
-## Project Structure
+---
+
+## What works today (Phase 1 — Live ✅)
+
+Two independent, self-hosted workflows, **no AI** — the foundation:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| **W1 — Capture & Confirm** | Telegram message | Extract amount + merchant → keyword-match category → append to Sheets → reply with confirmation |
+| **W2 — Evening Summary** | Daily at 9 PM IST | Aggregate the day's spend → write `DailySummary` → push a formatted Telegram summary |
+
+**Tested:** core parsing, categorization, and summary math are covered by a logic harness that runs the *real* Code-node JavaScript pulled straight from the workflow JSON — **40/40 checks passing**, no live bot required:
+
+```bash
+node tests/test_phase1.mjs
+```
+
+---
+
+## Roadmap
+
+| Phase | Capability | AI | Status |
+|---|---|---|---|
+| **1 — Foundation** | Telegram capture + daily summary, rule-based | — | ✅ Live |
+| **2 — AI Categorization** | Gemini extraction + confidence scoring + clarification fallback | ✓ | ⏳ Next |
+| **3 — Financial Insights** | Weekly pattern analysis + anomaly detection | ✓ | Planned |
+| **4 — AI Financial Coach** | Monthly report: savings rate, MoM trends, spending leaks | ✓ | Planned |
+| **5 — Agentic Assistant** | Ask questions; agent reasons over tools + memory (RAG) | ✓ | Planned |
+
+---
+
+## Data model
+
+Designed like a real database from day one (physically implemented as Google Sheets tabs):
+
+| Tab | Role |
+|---|---|
+| `Transactions` | Fact table — one row per logged expense |
+| `Categories` | Controlled vocabulary (Food & Dining, Transport, …) |
+| `CategoryRules` | Keyword → category mappings (also seeds Phase 2 AI few-shot) |
+| `DailySummary` | Aggregated daily rollup from W2 |
+
+A core design principle: **every AI-generated field sits next to a `user_corrected` / audit field**, so corrections are captured as data, not lost — the system is built to get more reliable over time.
+
+---
+
+## Repository layout
 
 ```
 PFOS/
-├── docs/                    # Architecture docs and notes
-├── n8n/
-│   ├── workflows/           # Exported n8n workflow JSON files
-│   └── credentials/         # Credential setup notes (no real secrets!)
-├── sheets/
-│   └── templates/           # CSV templates for Google Sheets tabs
-├── telegram/                # Bot setup notes and config
-├── scripts/                 # Helper scripts
-├── tests/
-│   └── sample-messages/     # Test messages for validating workflows
-├── logs/                    # Debug output (gitignored)
-├── setup.sh                 # Run this to create all folders
-├── .gitignore
+├── docs/                       # Architecture + per-workflow setup guides
+│   ├── PFOS_v4_Architecture.md
+│   ├── W1_setup_guide.md
+│   └── W2_setup_guide.md
+├── n8n/workflows/              # Importable workflow JSON (W1, W2)
+├── sheets/templates/           # CSV templates for each Sheets tab
+├── tests/test_phase1.mjs       # Logic test harness (no bot needed)
+├── setup.sh                    # Scaffolds the folder structure
 └── README.md
 ```
 
-## Phases Overview
+---
 
-| Phase | What It Does | AI? | Difficulty |
-|---|---|---|---|
-| **Phase 1: Foundation** | Log expenses via Telegram, daily summary | No | Beginner |
-| **Phase 2: AI Categorization** | Gemini extracts & categorizes expenses | Yes | Intermediate |
-| **Phase 3: Financial Insights** | Weekly pattern analysis & anomaly detection | Yes | Intermediate |
-| **Phase 4: AI Financial Coach** | Monthly reports with actionable advice | Yes | Advanced |
-| **Phase 5: Agentic Assistant** | Ask questions, get answers from your data | Yes | Advanced |
+## Getting started
 
-## Phase 1 — What You're Building First
-
-Phase 1 has **two workflows** and **no AI**. The goal is to prove the basic loop works.
-
-### Workflow W1: Capture & Confirm
-- **Trigger:** You send a Telegram message
-- **Action:** Extract amount + merchant, look up category, write to Sheets, reply with confirmation
-
-### Workflow W2: Evening Summary
-- **Trigger:** Scheduled at 9 PM daily
-- **Action:** Read today's transactions, calculate totals, write summary, send Telegram message
-
-### Google Sheets Tabs (Phase 1)
-
-| Tab | What Goes Here |
-|---|---|
-| `Transactions` | Every expense — one row per message you send |
-| `Categories` | List of valid categories (Food & Dining, Transport, etc.) |
-| `CategoryRules` | Keyword-to-category mappings (swiggy → Food & Dining) |
-| `DailySummary` | One row per day with totals |
-
-### Prerequisites
-
-Before building, you need:
-
-1. **Docker** installed and running on your machine
-2. **n8n** running in Docker (`docker run -it --rm -p 5678:5678 n8nio/n8n`)
-3. **Telegram bot** created via [@BotFather](https://t.me/BotFather) — save the token
-4. **Google Cloud project** with Sheets API enabled and OAuth credentials
-5. **Google Sheet** created with the four tabs listed above
-
-## Getting Started
+**Prerequisites:** Docker, a Telegram bot ([@BotFather](https://t.me/BotFather)), and a Google Cloud project with the Sheets API enabled.
 
 ```bash
-# 1. Clone and set up the folder structure
-git clone <your-repo-url>
+# 1. Clone
+git clone https://github.com/adarshyadavnitb-dotcom/PFOS.git
 cd PFOS
-chmod +x setup.sh
-./setup.sh
 
-# 2. Start n8n
-docker run -it --rm -p 5678:5678 n8nio/n8n
+# 2. Start n8n (with IST timezone)
+docker run -d --name n8n -p 5678:5678 \
+  -e GENERIC_TIMEZONE=Asia/Kolkata -e TZ=Asia/Kolkata \
+  -v n8n_data:/home/node/.n8n n8nio/n8n
 
-# 3. Open n8n in your browser
+# 3. Open n8n and import the workflows from n8n/workflows/
 open http://localhost:5678
 ```
 
-Then follow the Phase 1 implementation steps in `docs/PFOS_v4_Architecture.md`.
+Full step-by-step setup (Telegram bot, Sheets tabs, credentials, testing) is in
+[docs/W1_setup_guide.md](docs/W1_setup_guide.md) and [docs/W2_setup_guide.md](docs/W2_setup_guide.md).
 
-## Key Design Decisions
+> **Note:** for local self-hosting, Telegram reaches your machine via a tunnel (e.g. `cloudflared`). The tunnel URL must be live and set as n8n's `WEBHOOK_URL`.
 
-- **Separate workflows** — capture and summary are independent, so a bug in one can't break the other
-- **Schema-first** — Google Sheets tabs are designed like database tables, not random spreadsheets
-- **Config in Sheets, not code** — categories and keyword rules live in Sheets tabs, so changes don't require editing workflows
-- **No AI in Phase 1** — prove the plumbing works before adding complexity
+---
+
+## Engineering decisions worth calling out
+
+- **Composable, not monolithic** — capture and summary are separate workflows; a bug in one can't break the other, and each is independently testable.
+- **Schema-first** — entities and relationships designed before any tab was created, so new features don't force a rebuild.
+- **Config in data, not code** — categories and keyword rules live in Sheets, so changing behavior is a spreadsheet edit, not a workflow edit.
+- **Prove it without AI first** — Phase 1 is deliberately rule-based to validate the pipeline before adding model complexity (and cost).
+- **Tested logic** — the test harness executes the actual deployed Code-node logic, and even encodes a known limitation (substring keyword matching) as expected behavior so the suite stays honest.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
