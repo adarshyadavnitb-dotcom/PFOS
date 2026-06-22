@@ -298,7 +298,40 @@ Try a format like:
 
 ---
 
+## Known Limitations (Phase 1)
+
+These are intentional simplifications of the rule-based approach. Phase 2 (Gemini AI) removes most of them.
+
+### Keyword matching is substring-based and exact
+
+Category matching checks whether the merchant text *contains* a keyword from the `CategoryRules` tab. It does **not** handle spelling variations.
+
+- ✅ `grocery store` → matches keyword `grocery`
+- ❌ `groceries` → does **NOT** match keyword `grocery` (the spelling diverges at the end, so `grocery` is not a substring of `groceries`) → falls back to **Uncategorized**
+
+**Workaround:** add the variant forms you actually use as their own rows in the `CategoryRules` tab (e.g. add a `groceries` keyword alongside `grocery`). Each unmatched merchant you see is a one-line addition to the sheet — no workflow edit needed.
+
+### Other Phase 1 limitations
+
+- **One number per message** — the parser takes the *first* number as the amount. "2 coffees 300" would read amount = 2, not 300.
+- **No currency/date awareness** — everything is logged as ₹ at the current timestamp.
+- **First-match wins** — if a merchant contains two keywords, whichever appears first in the `CategoryRules` tab wins.
+
+---
+
 ## Testing the Workflow
+
+### Automated logic test (no Telegram needed)
+
+A test harness at `tests/test_phase1.mjs` extracts the real Code-node logic from the workflow JSON and runs it against sample inputs — useful for checking the parsing/categorization/summary logic without a live bot or VPN:
+
+```bash
+node tests/test_phase1.mjs
+```
+
+It asserts amount/merchant/category extraction, the Uncategorized fallback, error-path handling, and the W2 daily-summary math (including correct exclusion of other days' rows). The `groceries` → Uncategorized case above is encoded as expected behavior, so the suite documents the limitation rather than flagging it.
+
+### Manual test in n8n
 
 ### Step 1: Test each node individually
 
