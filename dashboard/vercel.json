@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/pfos/:path*",
+      "destination": "https://80.225.221.129.sslip.io/webhook/pfos-api/:path*"
+    }
+  ]
+}

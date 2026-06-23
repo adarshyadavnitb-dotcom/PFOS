@@ -148,7 +148,7 @@ One spreadsheet, multiple tabs, acting as relational-ish tables.
 
 ## 4. n8n Workflow Architecture
 
-Build PFOS as **5 separate workflows**, not one giant workflow. This is the single biggest maintainability decision you'll make.
+Build PFOS as **separate, single-purpose workflows**, not one giant workflow. This is the single biggest maintainability decision you'll make.
 
 | Workflow | Trigger | Responsibility |
 |---|---|---|
@@ -157,6 +157,7 @@ Build PFOS as **5 separate workflows**, not one giant workflow. This is the sing
 | **W3: Weekly Insights** | Schedule (e.g. Sunday 8 PM) | Read 7 days of data → Gemini pattern analysis → write `WeeklyInsights` → Telegram push |
 | **W4: Monthly Coach** | Schedule (1st of month) | Read full month + prior month → Gemini coaching synthesis → write `MonthlyReports` → Telegram push (long-form) |
 | **W5: Error/Fallback Handler** | Sub-workflow, called by W1–W4 | Catches malformed input, API failures; logs to an `Errors` tab; sends you a Telegram alert instead of failing silently |
+| **W6: Dashboard API** (Phase 5) | Webhook (GET/POST) | Token-gated JSON API over `Transactions`/summaries for the web dashboard; also handles quick-add and on-demand insight |
 
 ### Why split workflows
 - Each one is independently testable (you can manually trigger W4 without waiting a month).
@@ -193,7 +194,8 @@ Telegram Trigger
 - Phase 2: extraction + categorization
 - Phase 3: pattern/anomaly narrative generation
 - Phase 4: financial coaching synthesis, month-over-month reasoning
-- Phase 5: agentic — multi-step reasoning, tool-calling, RAG retrieval over `MemoryNote` tab
+- Phase 5: none new — a live dashboard frontend that visualizes the data and AI outputs already produced by W1–W4 (reuses existing aggregations via a JSON API)
+- Phase 6: agentic — multi-step reasoning, tool-calling, RAG retrieval over `MemoryNote` tab
 
 ---
 
@@ -366,7 +368,53 @@ Schedule Trigger (1st of month) → Google Sheets Read (current month Transactio
 
 ---
 
-### Phase 5: Agentic Finance Assistant
+### Phase 5: Live Dashboard Frontend
+
+**Objective:** Give the system a face. Everything so far is captured and reported over Telegram; Phase 5 adds a beautiful, interactive web dashboard that visualizes the data and AI outputs already produced by W1–W4. This is the portfolio centerpiece — the thing a recruiter or client *sees* in five seconds.
+
+**Architecture diagram:**
+```
+Browser (React SPA, dark glassmorphism)
+   │  same-origin fetch (no CORS — proxied)
+   ▼
+Vercel (static hosting + rewrites /api/pfos/* → n8n)
+   │
+   ▼
+n8n "W6 Dashboard API" workflow  ──reads/writes──►  Google Sheets (private DB)
+   • GET  /webhook/pfos-api/data     → aggregated JSON (txns, income, latest insights)
+   • POST /webhook/pfos-api/add      → quick-add expense
+   • POST /webhook/pfos-api/insight  → on-demand insight to Telegram
+   (all token-gated; Google credential stays server-side)
+```
+
+**Two modes, one codebase:**
+- **Demo mode (default, public):** ships with a bundled sample dataset. Safe to share on a résumé/LinkedIn — no real data, no secrets.
+- **Live mode:** a "Connect my data" action takes a secret access token, stored in the browser, to pull real numbers from the n8n API. Recruiters see the demo; the owner sees reality — same URL.
+
+**Required tech:** Vite + React + TypeScript + Tailwind CSS + Recharts + Framer Motion (frontend); n8n Webhook + Respond to Webhook + Google Sheets + Code nodes (backend API); Vercel (hosting + reverse-proxy rewrites).
+
+**Required APIs:** n8n webhook API (wrapping Google Sheets); Gemini + Telegram (reused via the insight endpoint).
+
+**Implementation steps:**
+1. Build the n8n JSON API as a separate workflow so the dashboard never touches Sheets or the Google credential directly — the sheet stays private.
+2. Token-gate every endpoint; proxy through Vercel rewrites (and a Vite dev proxy) so the browser is always same-origin — eliminates CORS entirely.
+3. Keep the API "dumb": return trimmed transactions + a few precomputed fields, and let the client do range/category filtering for instant, snappy switches.
+4. Build demo data that is generated relative to "today" so the Today/Week/Month switches all show something in the public demo.
+5. Add write actions (quick-add, generate-insight) last, and never expose destructive operations from the UI.
+
+**Estimated difficulty:** ⭐⭐⭐ (Intermediate — mostly frontend craft; the backend is a thin, well-scoped API over existing data)
+
+**Common mistakes:**
+- Calling the Google Sheets API directly from the browser (leaks credentials or forces the sheet public) instead of proxying through a server-side API
+- Fighting CORS with header hacks instead of removing it with a same-origin proxy
+- Putting real financial data on a public URL with no demo/live separation
+- Over-fetching (returning every row on every interaction) instead of fetch-once + filter-client-side
+
+**Testing approach:** Verify each API endpoint with `curl` (valid + invalid token) before wiring the UI. Build and type-check the frontend against the live API with your real data, then confirm the public deployment defaults to demo data with no token present.
+
+---
+
+### Phase 6: Agentic Finance Assistant
 
 **Objective:** Move from scheduled, one-way reports to an interactive agent — you can ask it questions ("How much did I spend on food this quarter vs my goal?"), it reasons over tools (Sheets queries, calculations) and your accumulated memory.
 

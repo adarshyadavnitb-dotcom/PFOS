@@ -1,0 +1,660 @@
+{
+  "name": "W6 \u2014 Dashboard API",
+  "nodes": [
+    {
+      "id": "wh-data",
+      "name": "API Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "wh-data",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pfos-api/data",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "if-data",
+      "name": "Auth Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "tok",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "r-tx",
+      "name": "R Transactions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        500,
+        -100
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "c-data",
+      "name": "Build Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const tx=$('R Transactions').all().map(i=>i.json);\nconst transactions=tx.filter(r=>r && (r.timestamp||r.amount)).map(r=>({\n  date:(r.timestamp||'').trim(), amount:parseFloat(r.amount)||0, merchant:(r.merchant_vendor||'Unknown').trim(),\n  category:(r.category||'Other').trim(), need_or_want:(r.need_or_want||'Want').trim(), month_key:(r.month_key||'').trim()\n}));\nreturn [{json:{ monthly_income:140700, transactions, generated_at:new Date().toISOString() }}];\n"
+      }
+    },
+    {
+      "id": "resp-data",
+      "name": "Respond Data",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "wh-add",
+      "name": "API Add",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "wh-add",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pfos-api/add",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "if-add",
+      "name": "Auth Add",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "tok",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c-add",
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        250
+      ],
+      "parameters": {
+        "jsCode": "\nconst b = $json.body || {};\nconst istOffset = 5.5*60*60*1000;\nconst now = new Date();\nconst ist = new Date(now.getTime()+istOffset);\nconst pad = n => String(n).padStart(2,'0');\nconst transaction_id = 'TXN-'+ist.getUTCFullYear()+pad(ist.getUTCMonth()+1)+pad(ist.getUTCDate())+'-'+pad(ist.getUTCHours())+pad(ist.getUTCMinutes())+pad(ist.getUTCSeconds());\nconst month_key = ist.getUTCFullYear()+'-'+pad(ist.getUTCMonth()+1);\nreturn [{ json: {\n  transaction_id, timestamp: now.toISOString(),\n  raw_message: ((b.merchant||'')+' '+(b.amount||'')).trim(),\n  amount: parseFloat(b.amount)||0,\n  merchant_vendor: b.merchant || 'Unknown',\n  category: b.category || 'Other',\n  subcategory: '',\n  need_or_want: b.need_or_want || 'Want',\n  payment_mode: 'Dashboard',\n  confidence_score: 1,\n  user_corrected: false,\n  month_key, source: 'dashboard'\n}}];\n"
+      }
+    },
+    {
+      "id": "w-add",
+      "name": "Write Tx",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        750,
+        250
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "resp-add",
+      "name": "Respond Add",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        250
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "wh-ins",
+      "name": "API Insight",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "wh-ins",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pfos-api/insight",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "if-ins",
+      "name": "Auth Insight",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        250,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "tok",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "r-txi",
+      "name": "R Tx Insight",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        500,
+        560
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "c-agg",
+      "name": "Aggregate Week Insight",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        560
+      ],
+      "parameters": {
+        "jsCode": "\nconst rows = $('R Tx Insight').all().map(i=>i.json);\nconst istOffset=5.5*60*60*1000; const now=new Date(); const msDay=864e5;\nconst istStr=d=>new Date(d.getTime()+istOffset).toISOString().split('T')[0];\nconst cutC=now.getTime()-7*msDay, cutP=now.getTime()-28*msDay;\nlet cur=[],pri=[];\nfor(const r of rows){ if(!r.timestamp) continue; const t=new Date(r.timestamp); if(isNaN(t.getTime()))continue;\n  const a=parseFloat(r.amount)||0; if(t.getTime()>=cutC)cur.push({...r,a}); else if(t.getTime()>=cutP)pri.push({...r,a}); }\nconst week_start=istStr(new Date(now.getTime()-6*msDay)), week_end=istStr(now);\nif(cur.length===0) return [{json:{hasData:false, statsJson:JSON.stringify({week_start,week_end,note:'no spend this week'})}}];\nconst sum=x=>x.reduce((s,r)=>s+r.a,0); const ct=Math.round(sum(cur)); const pavg=Math.round(sum(pri)/3);\nconst cat={}; for(const r of cur){const c=r.category||'Uncategorized'; cat[c]=(cat[c]||0)+r.a;}\nconst breakdown=Object.entries(cat).sort((x,y)=>y[1]-x[1]).map(([category,amount])=>({category,amount:Math.round(amount)}));\nconst need=sum(cur.filter(r=>(r.need_or_want||'').toLowerCase()==='need'));\nconst stats={week_start,week_end,current_week_total:ct,prior_3wk_avg_total:pavg,transaction_count:cur.length,\n  need_pct: ct>0?Math.round(need/ct*100):0, category_breakdown:breakdown};\nreturn [{json:{hasData:true, ...stats, statsJson:JSON.stringify(stats)}}];\n"
+      }
+    },
+    {
+      "id": "c-body",
+      "name": "Build Insight Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        560
+      ],
+      "parameters": {
+        "jsCode": "const s=$json.statsJson;\nif($json.hasData===false){return [{json:{skip:true, body:JSON.stringify({contents:[{parts:[{text:'noop'}]}]})}}];}\nconst prompt=\"You are a friendly personal finance coach writing a short on-demand weekly insight over Telegram. You are given PRE-COMPUTED stats; do NOT recalculate or invent numbers. Headline on total vs 3-week average, 2 short bullet observations, one encouraging tip. Under 110 words. No markdown (no asterisks). Use bullet char and INR sign. Stats JSON:\\n\"+s+'\\n\\nWrite only the message text.';\nreturn [{json:{skip:false, body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7}})}}];"
+      }
+    },
+    {
+      "id": "c-gem",
+      "name": "Call Gemini Insight",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=GEMINI_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}"
+      }
+    },
+    {
+      "id": "c-asm",
+      "name": "Assemble Insight",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        560
+      ],
+      "parameters": {
+        "jsCode": "const raw=$input.first().json;\nlet t=(raw.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();\nif(!t){const a=$('Aggregate Week Insight').first().json; t = a.hasData? ('Weekly spend INR '+a.current_week_total) : 'No expenses logged this week yet.';}\nreturn [{json:{success:true, insight:t}}];"
+      }
+    },
+    {
+      "id": "tg-ins",
+      "name": "Send Insight TG",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1750,
+        560
+      ],
+      "parameters": {
+        "chatId": "TELEGRAM_CHAT_ID",
+        "text": "={{ $('Assemble Insight').first().json.insight }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "40026905-7f0f-4243-845e-5fd1fd494def"
+    },
+    {
+      "id": "resp-ins",
+      "name": "Respond Insight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        560
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "resp-401",
+      "name": "Respond 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        850
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "unauthorized",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "API Data": {
+      "main": [
+        [
+          {
+            "node": "Auth Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Data": {
+      "main": [
+        [
+          {
+            "node": "R Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R Transactions": {
+      "main": [
+        [
+          {
+            "node": "Build Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Data": {
+      "main": [
+        [
+          {
+            "node": "Respond Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Add": {
+      "main": [
+        [
+          {
+            "node": "Auth Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Add": {
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row": {
+      "main": [
+        [
+          {
+            "node": "Write Tx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Tx": {
+      "main": [
+        [
+          {
+            "node": "Respond Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Insight": {
+      "main": [
+        [
+          {
+            "node": "Auth Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Insight": {
+      "main": [
+        [
+          {
+            "node": "R Tx Insight",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R Tx Insight": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Week Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Week Insight": {
+      "main": [
+        [
+          {
+            "node": "Build Insight Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Insight Body": {
+      "main": [
+        [
+          {
+            "node": "Call Gemini Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini Insight": {
+      "main": [
+        [
+          {
+            "node": "Assemble Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Insight": {
+      "main": [
+        [
+          {
+            "node": "Send Insight TG",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}
