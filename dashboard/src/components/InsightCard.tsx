@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 export function InsightCard({ text, loading }: { text?: string; loading: boolean }) {
   return (
     <div className="glass relative overflow-hidden p-5">
-      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-500/15 blur-2xl" />
       <div className="relative">
         <div className="mb-3 flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">

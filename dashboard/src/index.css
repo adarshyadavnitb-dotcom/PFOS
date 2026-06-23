@@ -18,29 +18,40 @@ body {
   -webkit-font-smoothing: antialiased;
   color: #0f172a;
   background-color: #eef2ff;
+  /* Gradients live on a fixed pseudo-element (below) so the body itself
+     stays cheap to scroll — avoids background-attachment:fixed repaint jank. */
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
-    radial-gradient(60rem 60rem at 110% -10%, rgba(139, 92, 246, 0.18), transparent 55%),
-    radial-gradient(50rem 50rem at -10% 10%, rgba(34, 211, 238, 0.16), transparent 55%);
-  background-attachment: fixed;
+    radial-gradient(55rem 55rem at 110% -10%, rgba(139, 92, 246, 0.16), transparent 55%),
+    radial-gradient(45rem 45rem at -10% 10%, rgba(34, 211, 238, 0.14), transparent 55%);
 }
 
 html.dark body {
   color: #e2e8f0;
   background-color: #060814;
+}
+
+html.dark body::before {
   background-image:
-    radial-gradient(60rem 60rem at 110% -10%, rgba(139, 92, 246, 0.22), transparent 55%),
-    radial-gradient(50rem 50rem at -10% 0%, rgba(34, 211, 238, 0.14), transparent 55%),
-    radial-gradient(40rem 40rem at 50% 120%, rgba(236, 72, 153, 0.12), transparent 55%);
+    radial-gradient(55rem 55rem at 110% -10%, rgba(139, 92, 246, 0.2), transparent 55%),
+    radial-gradient(45rem 45rem at -10% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
+    radial-gradient(38rem 38rem at 50% 120%, rgba(236, 72, 153, 0.1), transparent 55%);
 }
 
 @layer components {
   .glass {
-    @apply rounded-2xl border border-black/[0.06] bg-white/70 shadow-xl shadow-black/[0.04] backdrop-blur-xl
-           dark:border-white/10 dark:bg-white/[0.04] dark:shadow-black/30;
+    @apply rounded-2xl border border-black/[0.06] bg-white/80 shadow-lg shadow-black/[0.04] backdrop-blur-sm
+           dark:border-white/10 dark:bg-white/[0.05] dark:shadow-black/20;
   }
   .glass-hover {
-    @apply transition-all duration-300 hover:border-brand/40 hover:shadow-2xl hover:shadow-brand/10
-           dark:hover:border-brand/40;
+    @apply transition-colors duration-200 hover:border-brand/40 dark:hover:border-brand/40;
   }
   .pill {
     @apply rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200;

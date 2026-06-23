@@ -5,6 +5,16 @@ import react from "@vitejs/plugin-react";
 // same-origin (no CORS). In production, Vercel rewrites do the same thing.
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          recharts: ["recharts"],
+          vendor: ["react", "react-dom", "framer-motion"],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       "/api/pfos": {
