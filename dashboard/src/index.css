@@ -46,9 +46,12 @@ html.dark body::before {
 }
 
 @layer components {
+  /* No backdrop-filter: live blur repaints every scroll frame and is the
+     main cause of scroll jank. A semi-opaque fill over the static gradient
+     gives the same frosted look but composites cheaply. */
   .glass {
-    @apply rounded-2xl border border-black/[0.06] bg-white/80 shadow-lg shadow-black/[0.04] backdrop-blur-sm
-           dark:border-white/10 dark:bg-white/[0.05] dark:shadow-black/20;
+    @apply rounded-2xl border border-black/[0.06] bg-white/85 shadow-lg shadow-black/[0.04]
+           dark:border-white/10 dark:bg-slate-900/60 dark:shadow-black/20;
   }
   .glass-hover {
     @apply transition-colors duration-200 hover:border-brand/40 dark:hover:border-brand/40;
