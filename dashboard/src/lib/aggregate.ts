@@ -20,7 +20,14 @@ export function rangeStart(range: RangeKey, now = new Date()): Date {
 
 export function filterByRange(txns: Txn[], range: RangeKey, now = new Date()): Txn[] {
   const start = rangeStart(range, now).getTime();
-  const end = now.getTime() + 1;
+  // "month" uses end-of-calendar-month so pre-logged future entries in the same month are included.
+  // "all" has no upper bound. "today"/"week" cap at now.
+  const end =
+    range === "month"
+      ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime()
+      : range === "all"
+      ? Infinity
+      : now.getTime() + 1;
   return txns.filter((t) => {
     const ms = parseDate(t.date).getTime();
     return !isNaN(ms) && ms >= start && ms <= end;
