@@ -1,32 +1,43 @@
 {
-  "name": "W1 — Capture & Confirm",
+  "name": "W1 \u2014 Capture & Confirm",
   "nodes": [
     {
       "parameters": {
-        "updates": ["message"],
+        "updates": [
+          "message"
+        ],
         "additionalFields": {}
       },
       "id": "a1b2c3d4-1111-4000-8000-000000000001",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, 300],
+      "position": [
+        0,
+        300
+      ],
       "webhookId": "pfos-w1-capture"
     },
     {
       "parameters": {
-        "jsCode": "// ── STEP 1: Extract amount and merchant from the message ──\n// Handles formats like: \"450 swiggy\", \"swiggy 450\", \"spent 450 on swiggy\"\n\nconst rawMessage = $input.first().json.message.text;\n\nif (!rawMessage) {\n  return [{ json: { parseSuccess: false, error: 'Empty message' } }];\n}\n\n// Find the first number in the message (that's the amount)\nconst amountMatch = rawMessage.match(/(\\d+\\.?\\d*)/);\n\nif (!amountMatch) {\n  return [{ json: { parseSuccess: false, error: 'No amount found', rawMessage } }];\n}\n\nconst amount = parseFloat(amountMatch[1]);\n\n// Everything that's NOT the number is the merchant\n// Remove the number, trim whitespace, remove common filler words\nlet merchant = rawMessage\n  .replace(amountMatch[0], '')       // remove the number\n  .replace(/\\b(spent|paid|for|on|at|to|rs|inr|rupees)\\b/gi, '')  // remove filler words\n  .replace(/[^a-zA-Z0-9\\s]/g, '')    // remove special characters\n  .trim();\n\n// Capitalize first letter of each word\nmerchant = merchant\n  .split(' ')\n  .filter(word => word.length > 0)\n  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())\n  .join(' ');\n\nif (!merchant) {\n  merchant = 'Unknown';\n}\n\n// Generate a simple transaction ID: timestamp-based\nconst now = new Date();\nconst transactionId = 'TXN-' + now.getFullYear() +\n  String(now.getMonth() + 1).padStart(2, '0') +\n  String(now.getDate()).padStart(2, '0') + '-' +\n  String(now.getHours()).padStart(2, '0') +\n  String(now.getMinutes()).padStart(2, '0') +\n  String(now.getSeconds()).padStart(2, '0');\n\n// Month key for easy filtering later (e.g., \"2026-06\")\nconst monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');\n\nreturn [{\n  json: {\n    parseSuccess: true,\n    transactionId,\n    timestamp: now.toISOString(),\n    rawMessage,\n    amount,\n    merchant,\n    monthKey,\n    source: 'telegram_text'\n  }\n}];"
+        "jsCode": "// \u2500\u2500 STEP 1: Extract amount and merchant from the message \u2500\u2500\n// Handles formats like: \"450 swiggy\", \"swiggy 450\", \"spent 450 on swiggy\"\n\nconst rawMessage = $input.first().json.message.text;\n\nif (!rawMessage) {\n  return [{ json: { parseSuccess: false, error: 'Empty message' } }];\n}\n\n// Find the first number in the message (that's the amount)\nconst amountMatch = rawMessage.match(/(\\d+\\.?\\d*)/);\n\nif (!amountMatch) {\n  return [{ json: { parseSuccess: false, error: 'No amount found', rawMessage } }];\n}\n\nconst amount = parseFloat(amountMatch[1]);\n\n// Everything that's NOT the number is the merchant\n// Remove the number, trim whitespace, remove common filler words\nlet merchant = rawMessage\n  .replace(amountMatch[0], '')       // remove the number\n  .replace(/\\b(spent|paid|for|on|at|to|rs|inr|rupees)\\b/gi, '')  // remove filler words\n  .replace(/[^a-zA-Z0-9\\s]/g, '')    // remove special characters\n  .trim();\n\n// Capitalize first letter of each word\nmerchant = merchant\n  .split(' ')\n  .filter(word => word.length > 0)\n  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())\n  .join(' ');\n\nif (!merchant) {\n  merchant = 'Unknown';\n}\n\n// Generate a simple transaction ID: timestamp-based\nconst now = new Date();\nconst transactionId = 'TXN-' + now.getFullYear() +\n  String(now.getMonth() + 1).padStart(2, '0') +\n  String(now.getDate()).padStart(2, '0') + '-' +\n  String(now.getHours()).padStart(2, '0') +\n  String(now.getMinutes()).padStart(2, '0') +\n  String(now.getSeconds()).padStart(2, '0');\n\n// Month key for easy filtering later (e.g., \"2026-06\")\nconst monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');\n\nreturn [{\n  json: {\n    parseSuccess: true,\n    transactionId,\n    timestamp: now.toISOString(),\n    rawMessage,\n    amount,\n    merchant,\n    monthKey,\n    source: 'telegram_text'\n  }\n}];"
       },
       "id": "a1b2c3d4-1111-4000-8000-000000000002",
       "name": "Parse Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "condition-parse-check",
@@ -45,7 +56,10 @@
       "name": "Parse OK?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -65,7 +79,10 @@
       "name": "Read CategoryRules",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [750, 200],
+      "position": [
+        750,
+        200
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -75,13 +92,16 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── STEP 2: Match merchant to a category using the keyword rules ──\n\n// Get the parsed transaction from the 'Parse Message' node\nconst transaction = $('Parse Message').first().json;\nconst merchant = transaction.merchant.toLowerCase();\n\n// Get all category rules from the Google Sheets read\nconst rules = $('Read CategoryRules').all().map(item => item.json);\n\n// Try to find a matching keyword\nlet category = 'Uncategorized';\nlet needOrWant = 'Want';  // default\n\nfor (const rule of rules) {\n  const keyword = (rule.keyword || '').toLowerCase().trim();\n  if (keyword && merchant.toLowerCase().includes(keyword)) {\n    category = rule.category || 'Uncategorized';\n    needOrWant = rule.need_or_want || 'Want';\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    transaction_id: transaction.transactionId,\n    timestamp: transaction.timestamp,\n    raw_message: transaction.rawMessage,\n    amount: transaction.amount,\n    merchant_vendor: transaction.merchant,\n    category: category,\n    subcategory: '',\n    need_or_want: needOrWant,\n    payment_mode: 'Unspecified',\n    confidence_score: '',\n    user_corrected: false,\n    month_key: transaction.monthKey,\n    source: transaction.source\n  }\n}];"
+        "jsCode": "// \u2500\u2500 STEP 2: Match merchant to a category using the keyword rules \u2500\u2500\n\n// Get the parsed transaction from the 'Parse Message' node\nconst transaction = $('Parse Message').first().json;\nconst merchant = transaction.merchant.toLowerCase();\n\n// Get all category rules from the Google Sheets read\nconst rules = $('Read CategoryRules').all().map(item => item.json);\n\n// Try to find a matching keyword\nlet category = 'Uncategorized';\nlet needOrWant = 'Want';  // default\n\nfor (const rule of rules) {\n  const keyword = (rule.keyword || '').toLowerCase().trim();\n  if (keyword && merchant.toLowerCase().includes(keyword)) {\n    category = rule.category || 'Uncategorized';\n    needOrWant = rule.need_or_want || 'Want';\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    transaction_id: transaction.transactionId,\n    timestamp: transaction.timestamp,\n    raw_message: transaction.rawMessage,\n    amount: transaction.amount,\n    merchant_vendor: transaction.merchant,\n    category: category,\n    subcategory: '',\n    need_or_want: needOrWant,\n    payment_mode: 'Unspecified',\n    confidence_score: '',\n    user_corrected: false,\n    month_key: transaction.monthKey,\n    source: transaction.source\n  }\n}];"
       },
       "id": "a1b2c3d4-1111-4000-8000-000000000005",
       "name": "Match Category",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 200]
+      "position": [
+        1000,
+        200
+      ]
     },
     {
       "parameters": {
@@ -120,7 +140,10 @@
       "name": "Write to Transactions",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1250, 200],
+      "position": [
+        1250,
+        200
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -131,7 +154,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
-        "text": "=✅ ₹{{ $('Match Category').first().json.amount }} logged under {{ $('Match Category').first().json.category }} ({{ $('Match Category').first().json.need_or_want }})\n\n🏪 {{ $('Match Category').first().json.merchant_vendor }}",
+        "text": "=\u2705 \u20b9{{ $('Match Category').first().json.amount }} logged under {{ $('Match Category').first().json.category }} ({{ $('Match Category').first().json.need_or_want }})\n\n\ud83c\udfea {{ $('Match Category').first().json.merchant_vendor }}",
         "additionalFields": {
           "parse_mode": "HTML"
         }
@@ -140,7 +163,10 @@
       "name": "Send Confirmation",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1500, 200],
+      "position": [
+        1500,
+        200
+      ],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -151,14 +177,17 @@
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
-        "text": "=❌ Couldn't understand that message.\n\nTry a format like:\n• 450 Swiggy\n• Uber 200\n• Spent 300 on groceries",
+        "text": "=\u274c Couldn't understand that message.\n\nTry a format like:\n\u2022 450 Swiggy\n\u2022 Uber 200\n\u2022 Spent 300 on groceries",
         "additionalFields": {}
       },
       "id": "a1b2c3d4-1111-4000-8000-000000000008",
       "name": "Send Error Reply",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [750, 450],
+      "position": [
+        750,
+        450
+      ],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -247,8 +276,13 @@
     "executionOrder": "v1"
   },
   "tags": [
-    { "name": "PFOS" },
-    { "name": "Phase 1" }
+    {
+      "name": "PFOS"
+    },
+    {
+      "name": "Phase 1"
+    }
   ],
-  "pinData": {}
+  "pinData": {},
+  "id": "afbbb7be"
 }

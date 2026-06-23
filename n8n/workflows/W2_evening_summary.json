@@ -1,5 +1,5 @@
 {
-  "name": "W2 — Evening Summary",
+  "name": "W2 \u2014 Evening Summary",
   "nodes": [
     {
       "parameters": {
@@ -15,7 +15,10 @@
       "name": "Every Day at 9 PM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
@@ -36,7 +39,10 @@
       "name": "Read Transactions",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -46,13 +52,16 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── Filter to today's transactions and compute summary stats ──\n\nconst allRows = $input.all().map(item => item.json);\n\n// Get today's date in YYYY-MM-DD format (IST)\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset);\nconst todayStr = ist.toISOString().split('T')[0];\n\n// Filter rows to only today's transactions\nconst todayRows = allRows.filter(row => {\n  if (!row.timestamp) return false;\n  const rowDate = new Date(row.timestamp);\n  // Skip rows whose timestamp can't be parsed (avoids \"Invalid time value\")\n  if (isNaN(rowDate.getTime())) return false;\n  const rowIST = new Date(rowDate.getTime() + istOffset);\n  return rowIST.toISOString().split('T')[0] === todayStr;\n});\n\n// If no transactions today, return a \"nothing spent\" summary\nif (todayRows.length === 0) {\n  return [{\n    json: {\n      hasData: false,\n      date: todayStr,\n      total_spend: 0,\n      top_category: 'None',\n      transaction_count: 0,\n      need_pct: 0,\n      summaryText: `📊 Daily Summary — ${todayStr}\\n\\nNo expenses logged today. Nice! 🎉`\n    }\n  }];\n}\n\n// Calculate totals\nconst totalSpend = todayRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);\nconst transactionCount = todayRows.length;\n\n// Count by category to find top category\nconst categoryTotals = {};\nfor (const row of todayRows) {\n  const cat = row.category || 'Uncategorized';\n  categoryTotals[cat] = (categoryTotals[cat] || 0) + (parseFloat(row.amount) || 0);\n}\nconst topCategory = Object.entries(categoryTotals)\n  .sort((a, b) => b[1] - a[1])[0][0];\n\n// Calculate need vs want percentage\nconst needTotal = todayRows\n  .filter(row => (row.need_or_want || '').toLowerCase() === 'need')\n  .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);\nconst needPct = totalSpend > 0 ? Math.round((needTotal / totalSpend) * 100) : 0;\nconst wantPct = 100 - needPct;\n\n// Build the category breakdown lines\nconst categoryLines = Object.entries(categoryTotals)\n  .sort((a, b) => b[1] - a[1])\n  .map(([cat, amt]) => `  • ${cat}: ₹${amt}`)\n  .join('\\n');\n\n// Format the Telegram message\nconst summaryText = `📊 Daily Summary — ${todayStr}\n\n💰 Total: ₹${totalSpend}\n📝 Transactions: ${transactionCount}\n🏆 Top category: ${topCategory}\n\n📋 Breakdown:\n${categoryLines}\n\n⚖️ Needs: ${needPct}% | Wants: ${wantPct}%`;\n\nreturn [{\n  json: {\n    hasData: true,\n    date: todayStr,\n    total_spend: totalSpend,\n    top_category: topCategory,\n    transaction_count: transactionCount,\n    need_pct: needPct,\n    summaryText\n  }\n}];"
+        "jsCode": "// \u2500\u2500 Filter to today's transactions and compute summary stats \u2500\u2500\n\nconst allRows = $input.all().map(item => item.json);\n\n// Get today's date in YYYY-MM-DD format (IST)\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset);\nconst todayStr = ist.toISOString().split('T')[0];\n\n// Filter rows to only today's transactions\nconst todayRows = allRows.filter(row => {\n  if (!row.timestamp) return false;\n  const rowDate = new Date(row.timestamp);\n  // Skip rows whose timestamp can't be parsed (avoids \"Invalid time value\")\n  if (isNaN(rowDate.getTime())) return false;\n  const rowIST = new Date(rowDate.getTime() + istOffset);\n  return rowIST.toISOString().split('T')[0] === todayStr;\n});\n\n// If no transactions today, return a \"nothing spent\" summary\nif (todayRows.length === 0) {\n  return [{\n    json: {\n      hasData: false,\n      date: todayStr,\n      total_spend: 0,\n      top_category: 'None',\n      transaction_count: 0,\n      need_pct: 0,\n      summaryText: `\ud83d\udcca Daily Summary \u2014 ${todayStr}\\n\\nNo expenses logged today. Nice! \ud83c\udf89`\n    }\n  }];\n}\n\n// Calculate totals\nconst totalSpend = todayRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);\nconst transactionCount = todayRows.length;\n\n// Count by category to find top category\nconst categoryTotals = {};\nfor (const row of todayRows) {\n  const cat = row.category || 'Uncategorized';\n  categoryTotals[cat] = (categoryTotals[cat] || 0) + (parseFloat(row.amount) || 0);\n}\nconst topCategory = Object.entries(categoryTotals)\n  .sort((a, b) => b[1] - a[1])[0][0];\n\n// Calculate need vs want percentage\nconst needTotal = todayRows\n  .filter(row => (row.need_or_want || '').toLowerCase() === 'need')\n  .reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);\nconst needPct = totalSpend > 0 ? Math.round((needTotal / totalSpend) * 100) : 0;\nconst wantPct = 100 - needPct;\n\n// Build the category breakdown lines\nconst categoryLines = Object.entries(categoryTotals)\n  .sort((a, b) => b[1] - a[1])\n  .map(([cat, amt]) => `  \u2022 ${cat}: \u20b9${amt}`)\n  .join('\\n');\n\n// Format the Telegram message\nconst summaryText = `\ud83d\udcca Daily Summary \u2014 ${todayStr}\n\n\ud83d\udcb0 Total: \u20b9${totalSpend}\n\ud83d\udcdd Transactions: ${transactionCount}\n\ud83c\udfc6 Top category: ${topCategory}\n\n\ud83d\udccb Breakdown:\n${categoryLines}\n\n\u2696\ufe0f Needs: ${needPct}% | Wants: ${wantPct}%`;\n\nreturn [{\n  json: {\n    hasData: true,\n    date: todayStr,\n    total_spend: totalSpend,\n    top_category: topCategory,\n    transaction_count: transactionCount,\n    need_pct: needPct,\n    summaryText\n  }\n}];"
       },
       "id": "b1b2c3d4-2222-4000-8000-000000000003",
       "name": "Calculate Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -83,7 +92,10 @@
       "name": "Write to DailySummary",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [750, 300],
+      "position": [
+        750,
+        300
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -101,7 +113,10 @@
       "name": "Send Summary to Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1000, 300],
+      "position": [
+        1000,
+        300
+      ],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -161,8 +176,13 @@
     "executionOrder": "v1"
   },
   "tags": [
-    { "name": "PFOS" },
-    { "name": "Phase 1" }
+    {
+      "name": "PFOS"
+    },
+    {
+      "name": "Phase 1"
+    }
   ],
-  "pinData": {}
+  "pinData": {},
+  "id": "206747ea"
 }
