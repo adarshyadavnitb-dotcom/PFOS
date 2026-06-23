@@ -1,0 +1,340 @@
+{
+  "name": "W3 \u2014 Weekly Insights",
+  "nodes": [
+    {
+      "id": "w3-schedule",
+      "name": "Every Sunday 8 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 20,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "w3-read-tx",
+      "name": "Read Transactions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "w3-aggregate",
+      "name": "Aggregate Week",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst rows = $input.all().map(i => i.json);\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst now = new Date();\nconst msDay = 24*60*60*1000;\nconst istStr = d => new Date(d.getTime()+istOffset).toISOString().split('T')[0];\n\nconst cutCurrent = now.getTime() - 7*msDay;\nconst cutPrior   = now.getTime() - 28*msDay;\n\nlet current = [], prior = [];\nfor (const r of rows){\n  if(!r.timestamp) continue;\n  const t = new Date(r.timestamp);\n  if(isNaN(t.getTime())) continue;\n  const ms = t.getTime();\n  const amt = parseFloat(r.amount)||0;\n  if(ms >= cutCurrent) current.push({...r, amt});\n  else if(ms >= cutPrior) prior.push({...r, amt});\n}\n\nconst week_start = istStr(new Date(now.getTime() - 6*msDay));\nconst week_end   = istStr(now);\n\nif(current.length === 0){\n  return [{ json: {\n    hasData: false, week_start, week_end,\n    noDataText: `\ud83d\udcc8 Weekly Insight \u2014 ${week_start} to ${week_end}\\n\\nNo expenses logged this week. \ud83c\udf31`\n  }}];\n}\n\nconst sum = a => a.reduce((s,r)=>s+r.amt,0);\nconst currentTotal = sum(current);\nconst priorWeeklyAvg = Math.round(sum(prior)/3);\n\nconst catTotals = arr => { const m={}; for(const r of arr){const c=r.category||'Uncategorized'; m[c]=(m[c]||0)+r.amt;} return m; };\nconst curCat = catTotals(current), priCat = catTotals(prior);\n\nconst category_breakdown = Object.entries(curCat).sort((a,b)=>b[1]-a[1])\n  .map(([category,amount])=>({ category, amount: Math.round(amount), prior_avg: Math.round((priCat[category]||0)/3) }));\n\nconst needTotal = current.filter(r=>(r.need_or_want||'').toLowerCase()==='need').reduce((s,r)=>s+r.amt,0);\nconst need_pct = currentTotal>0 ? Math.round(needTotal/currentTotal*100) : 0;\n\nlet big = current.reduce((mx,r)=> r.amt>((mx&&mx.amt)||0)?r:mx, null);\nconst biggest_transaction = big ? { merchant: big.merchant_vendor||'Unknown', amount: Math.round(big.amt), category: big.category||'Other' } : null;\n\nconst anomalies = [];\nfor(const c of category_breakdown){\n  if(c.prior_avg > 0 && c.amount >= c.prior_avg*1.5 && (c.amount-c.prior_avg) >= 300){\n    const pct = Math.round((c.amount-c.prior_avg)/c.prior_avg*100);\n    anomalies.push(`${c.category} up ${pct}% vs 3-week avg (\u20b9${c.amount} vs \u20b9${c.prior_avg})`);\n  } else if(c.prior_avg === 0 && c.amount >= 500){\n    anomalies.push(`${c.category} is new this week (\u20b9${c.amount})`);\n  }\n}\nconst anomaly_flag = anomalies.length>0;\nconst anomaly_detail = anomalies.join('; ') || 'None';\n\nconst stats = {\n  week_start, week_end,\n  current_week_total: Math.round(currentTotal),\n  prior_3wk_avg_total: priorWeeklyAvg,\n  transaction_count: current.length,\n  need_pct, want_pct: 100-need_pct,\n  category_breakdown, biggest_transaction,\n  anomaly_flag, anomaly_detail\n};\nreturn [{ json: { hasData: true, ...stats, statsJson: JSON.stringify(stats) } }];\n"
+      }
+    },
+    {
+      "id": "w3-hasdata",
+      "name": "Has Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "hd",
+              "leftValue": "={{ $json.hasData }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "w3-build-body",
+      "name": "Build Gemini Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const s = $json.statsJson;\nconst prompt = \"You are a friendly personal finance coach writing a weekly spending insight over Telegram.\\n\\nYou are given PRE-COMPUTED statistics. Do NOT recalculate anything. Do NOT invent numbers. Only narrate the numbers provided.\\n\\nWrite a concise, scannable Telegram message. Structure:\\n1. A headline line with an emoji on this week's total vs the 3-week average (up/down).\\n2. 2-3 short bullet observations on notable categories (especially any anomalies flagged).\\n3. One practical, specific, encouraging tip based on the data.\\n\\nRules:\\n- Under 130 words.\\n- Do NOT use markdown formatting (no asterisks, no underscores, no bold). Plain text only.\\n- Use the bullet character \\u2022 for lists.\\n- Use \\u20b9 for all amounts.\\n\\nThis week's pre-computed stats (JSON):\\n\" + s + '\\n\\nWrite only the Telegram message text, no preamble.';\nreturn [{ json: { body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.7} }) } }];\n"
+      }
+    },
+    {
+      "id": "w3-call-gemini",
+      "name": "Call Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=GEMINI_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}"
+      }
+    },
+    {
+      "id": "w3-assemble",
+      "name": "Assemble Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        200
+      ],
+      "parameters": {
+        "jsCode": "\nconst raw = $input.first().json;\nlet narrative = (raw.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();\nconst agg = $('Aggregate Week').first().json;\nif(!narrative){\n  narrative = `\ud83d\udcc8 Weekly Insight \u2014 ${agg.week_start} to ${agg.week_end}\\n\\nTotal: \u20b9${agg.current_week_total} (3-wk avg \u20b9${agg.prior_3wk_avg_total})`;\n}\nreturn [{ json: {\n  week_start: agg.week_start,\n  insight_text: narrative,\n  anomaly_flag: agg.anomaly_flag,\n  anomaly_detail: agg.anomaly_detail\n}}];\n"
+      }
+    },
+    {
+      "id": "w3-write",
+      "name": "Write to WeeklyInsights",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1750,
+        200
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 670495293,
+          "mode": "list",
+          "cachedResultName": "WeeklyInsights",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=670495293"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "w3-send-insight",
+      "name": "Send Insight",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        200
+      ],
+      "parameters": {
+        "chatId": "TELEGRAM_CHAT_ID",
+        "text": "={{ $('Assemble Row').first().json.insight_text }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "123cb1e2-05c0-4a6b-8112-f1eee7c29e8f"
+    },
+    {
+      "id": "w3-send-nodata",
+      "name": "Send No-Data Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        450
+      ],
+      "parameters": {
+        "chatId": "TELEGRAM_CHAT_ID",
+        "text": "={{ $('Aggregate Week').first().json.noDataText }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "df407795-afc8-4835-8bdd-056fe5aae897"
+    }
+  ],
+  "connections": {
+    "Every Sunday 8 PM": {
+      "main": [
+        [
+          {
+            "node": "Read Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Transactions": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Week": {
+      "main": [
+        [
+          {
+            "node": "Has Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Data?": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send No-Data Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gemini Body": {
+      "main": [
+        [
+          {
+            "node": "Call Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini": {
+      "main": [
+        [
+          {
+            "node": "Assemble Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Row": {
+      "main": [
+        [
+          {
+            "node": "Write to WeeklyInsights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to WeeklyInsights": {
+      "main": [
+        [
+          {
+            "node": "Send Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}
