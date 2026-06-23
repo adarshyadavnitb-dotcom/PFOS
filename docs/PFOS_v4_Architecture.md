@@ -158,6 +158,7 @@ Build PFOS as **separate, single-purpose workflows**, not one giant workflow. Th
 | **W4: Monthly Coach** | Schedule (1st of month) | Read full month + prior month → Gemini coaching synthesis → write `MonthlyReports` → Telegram push (long-form) |
 | **W5: Error/Fallback Handler** | Sub-workflow, called by W1–W4 | Catches malformed input, API failures; logs to an `Errors` tab; sends you a Telegram alert instead of failing silently |
 | **W6: Dashboard API** (Phase 5) | Webhook (GET/POST) | Token-gated JSON API over `Transactions`/summaries for the web dashboard; also handles quick-add and on-demand insight |
+| **W7: Agent API** (Phase 6) | Webhook (GET/POST) | Token-gated tools for the AI agent: `/query` (aggregate spending), `/memory` (recall + save notes to `MemoryNote`) |
 
 ### Why split workflows
 - Each one is independently testable (you can manually trigger W4 without waiting a month).
@@ -450,6 +451,8 @@ Telegram Trigger (any message, not just expense capture)
 - Over-scoping tools (too many capabilities at once) instead of shipping 2–3 reliable tools first
 
 **Testing approach:** Maintain a fixed set of 10–15 test questions spanning categories, time ranges, and goals; re-run them after every change to catch regressions — this becomes your informal eval suite, and is itself a good artifact to show consulting clients as "how I validate AI agent reliability."
+
+**Implemented (v1):** Intent routing added to W1 (heuristic classifier → expense pipeline vs AI Agent). The agent is an n8n LangChain **tools agent** using a Gemini chat model (`gemini-3.1-flash-lite`) with three `toolHttpRequest` tools (`query_transactions`, `recall_memory`, `save_memory`) that call **W7 Agent API** over HTTP; persistent memory is the `MemoryNote` tab (RAG-lite via the recall/save tools). The agent has read + append-only-memory access — no transaction-edit tool, so it cannot corrupt the ledger. All spending figures come from the deterministic `/query` endpoint, never from the model. See `docs/Phase6_agent_setup_guide.md`.
 
 ---
 

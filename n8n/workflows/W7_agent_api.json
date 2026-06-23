@@ -1,0 +1,542 @@
+{
+  "name": "W7 \u2014 Agent API",
+  "nodes": [
+    {
+      "id": "qwh",
+      "name": "Q Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "qwh",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pfos-api/query",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "qauth",
+      "name": "Q Auth",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qread",
+      "name": "Q Read",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        -60
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "qcalc",
+      "name": "Q Compute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -60
+      ],
+      "parameters": {
+        "jsCode": "\nconst q = $('Q Webhook').first().json.query || {};\nconst rows = $('Q Read').all().map(i=>i.json);\nconst istOffset=5.5*3600*1000;\nconst dstr = r => { if(!r.timestamp) return null; const t=new Date(r.timestamp); if(isNaN(t.getTime())) return null; return new Date(t.getTime()+istOffset).toISOString().slice(0,10); };\nconst amt = r => parseFloat(r.amount)||0;\nlet f = rows.filter(r => r.amount!=null && String(r.amount).trim()!=='');\nif(q.category) f=f.filter(r=>(r.category||'').toLowerCase()===String(q.category).toLowerCase());\nif(q.need_or_want) f=f.filter(r=>(r.need_or_want||'').toLowerCase()===String(q.need_or_want).toLowerCase());\nif(q.start_date) f=f.filter(r=>{const d=dstr(r); return d && d>=q.start_date;});\nif(q.end_date) f=f.filter(r=>{const d=dstr(r); return d && d<=q.end_date;});\nconst total=f.reduce((s,r)=>s+amt(r),0), count=f.length;\nconst result={ filters:q, total_spend:Math.round(total), transaction_count:count, average_per_txn: count?Math.round(total/count):0 };\nconst gb=(q.group_by||'').toLowerCase();\nif(gb==='category'){ const m={}; f.forEach(r=>{const c=r.category||'Other'; m[c]=(m[c]||0)+amt(r);}); result.by_category=Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({category:k,amount:Math.round(v)})); }\nelse if(gb==='month'){ const m={}; f.forEach(r=>{const k=r.month_key||(dstr(r)||'').slice(0,7); m[k]=(m[k]||0)+amt(r);}); result.by_month=Object.entries(m).sort().map(([k,v])=>({month:k,amount:Math.round(v)})); }\nelse if(gb==='merchant'){ const m={}; f.forEach(r=>{const k=r.merchant_vendor||'Unknown'; m[k]=(m[k]||0)+amt(r);}); result.top_merchants=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({merchant:k,amount:Math.round(v)})); }\nreturn [{ json: result }];\n"
+      }
+    },
+    {
+      "id": "qresp",
+      "name": "Q Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -60
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "q401",
+      "name": "Q 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        160
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "unauthorized",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "mwh",
+      "name": "M Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        320
+      ],
+      "webhookId": "mwh",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pfos-api/memory",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "mauth",
+      "name": "M Auth",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mread",
+      "name": "M Read",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        260
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 660402038,
+          "mode": "list",
+          "cachedResultName": "MemoryNote",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=660402038"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "mbuild",
+      "name": "M Build",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        260
+      ],
+      "parameters": {
+        "jsCode": "const q=$('M Webhook').first().json.query||{};\nlet notes=$('M Read').all().map(i=>i.json).filter(r=>r.note).map(r=>({timestamp:r.timestamp,note:r.note,tags:r.tags||''}));\nif(q.q){const kw=String(q.q).toLowerCase(); notes=notes.filter(n=>((n.note||'')+' '+(n.tags||'')).toLowerCase().includes(kw));}\nreturn [{json:{count:notes.length, notes}}];"
+      }
+    },
+    {
+      "id": "mresp",
+      "name": "M Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        260
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "mswh",
+      "name": "MS Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        560
+      ],
+      "webhookId": "mswh",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pfos-api/memory",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "msauth",
+      "name": "MS Auth",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t",
+              "leftValue": "={{ $json.query.token }}",
+              "rightValue": "DASHBOARD_TOKEN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "msbuild",
+      "name": "MS Build",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        560
+      ],
+      "parameters": {
+        "jsCode": "const b=$('MS Webhook').first().json.body||{};\nreturn [{json:{ timestamp:new Date().toISOString(), note: (b.note||'').toString(), tags: (b.tags||'').toString() }}];"
+      }
+    },
+    {
+      "id": "msappend",
+      "name": "MS Append",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        560
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 660402038,
+          "mode": "list",
+          "cachedResultName": "MemoryNote",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=660402038"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "msresp",
+      "name": "MS Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        560
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Q Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q Auth": {
+      "main": [
+        [
+          {
+            "node": "Q Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Q 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q Read": {
+      "main": [
+        [
+          {
+            "node": "Q Compute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q Compute": {
+      "main": [
+        [
+          {
+            "node": "Q Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M Webhook": {
+      "main": [
+        [
+          {
+            "node": "M Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M Auth": {
+      "main": [
+        [
+          {
+            "node": "M Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Q 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M Read": {
+      "main": [
+        [
+          {
+            "node": "M Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M Build": {
+      "main": [
+        [
+          {
+            "node": "M Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MS Webhook": {
+      "main": [
+        [
+          {
+            "node": "MS Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MS Auth": {
+      "main": [
+        [
+          {
+            "node": "MS Build",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Q 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MS Build": {
+      "main": [
+        [
+          {
+            "node": "MS Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MS Append": {
+      "main": [
+        [
+          {
+            "node": "MS Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}

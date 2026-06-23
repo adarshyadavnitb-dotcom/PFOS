@@ -1,11 +1,5 @@
 {
-  "updatedAt": "2026-06-23T08:23:59.430Z",
-  "createdAt": "2026-06-23T07:23:48.007Z",
-  "id": "afbbb7be",
   "name": "W1 \u2014 Capture & Confirm",
-  "description": null,
-  "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -40,7 +34,7 @@
         300
       ],
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message.text || '';\nconst prompt = \"You are a personal finance assistant. Extract expense details from the user message and return ONLY a JSON object, no other text, no markdown.\\n\\nCategories (use exactly as written):\\nFood & Dining, Transport, Groceries, Shopping, Entertainment, Health, Utilities, Education, Personal Care, Other\\n\\nReturn JSON with:\\n- amount: number\\n- merchant: cleaned name\\n- category: from list above\\n- need_or_want: Need or Want\\n- confidence: 0.0 to 1.0\\n\\nExamples:\\n\\\"450 swiggy\\\" -> {\\\"amount\\\":450,\\\"merchant\\\":\\\"Swiggy\\\",\\\"category\\\":\\\"Food & Dining\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":0.95}\\n\\\"uber 85\\\" -> {\\\"amount\\\":85,\\\"merchant\\\":\\\"Uber\\\",\\\"category\\\":\\\"Transport\\\",\\\"need_or_want\\\":\\\"Need\\\",\\\"confidence\\\":1.0}\\n\\\"Netflix 649\\\" -> {\\\"amount\\\":649,\\\"merchant\\\":\\\"Netflix\\\",\\\"category\\\":\\\"Entertainment\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":1.0}\\n\\nMessage: \\\"REPLACE_MESSAGE\\\"\\n\\nReturn only the JSON object.\".replace('REPLACE_MESSAGE', msg);\nreturn [{ json: { body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) } }];\n"
+        "jsCode": "const msg = $('Telegram Trigger').first().json.message.text || '';\nconst prompt = \"You are a personal finance assistant. Extract expense details from the user message and return ONLY a JSON object, no other text, no markdown.\\n\\nCategories (use exactly as written):\\nFood & Dining, Transport, Groceries, Shopping, Entertainment, Health, Utilities, Education, Personal Care, Other\\n\\nReturn JSON with:\\n- amount: number\\n- merchant: cleaned name\\n- category: from list above\\n- need_or_want: Need or Want\\n- confidence: 0.0 to 1.0\\n\\nExamples:\\n\\\"450 swiggy\\\" -> {\\\"amount\\\":450,\\\"merchant\\\":\\\"Swiggy\\\",\\\"category\\\":\\\"Food & Dining\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":0.95}\\n\\\"uber 85\\\" -> {\\\"amount\\\":85,\\\"merchant\\\":\\\"Uber\\\",\\\"category\\\":\\\"Transport\\\",\\\"need_or_want\\\":\\\"Need\\\",\\\"confidence\\\":1.0}\\n\\\"Netflix 649\\\" -> {\\\"amount\\\":649,\\\"merchant\\\":\\\"Netflix\\\",\\\"category\\\":\\\"Entertainment\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":1.0}\\n\\nMessage: \\\"REPLACE_MESSAGE\\\"\\n\\nReturn only the JSON object.\".replace('REPLACE_MESSAGE', msg);\nreturn [{ json: { body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) } }];\n"
       }
     },
     {
@@ -223,6 +217,248 @@
           "name": ""
         }
       }
+    },
+    {
+      "id": "classify",
+      "name": "Classify Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const text=($('Telegram Trigger').first().json.message.text||'').trim();\nconst l=text.toLowerCase();\nconst qw=['?','how ','how much','what','which','when ','show','list','total','average','avg','did i','do i','my biggest','top ','compare','remember','recall','remind','goal','tell me','summary','breakdown','why ','spent on what','where did'];\nconst isQ=qw.some(w=>l.includes(w));\nconst hasNum=/[0-9]/.test(text);\nlet intent = isQ ? 'question' : (hasNum ? 'expense' : 'question');\nreturn [{json:{intent, text}}];"
+      }
+    },
+    {
+      "id": "route",
+      "name": "Route",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r",
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "expense",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        650,
+        200
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').first().json.message.text }}",
+        "options": {
+          "systemMessage": "=You are PFOS, the user's personal finance assistant on Telegram. Today is {{ $now.format('yyyy-MM-dd') }}. For ANY question about spending amounts you MUST call query_transactions and use its exact numbers; never guess or do math yourself. Categories are: Food & Dining, Transport, Groceries, Shopping, Entertainment, Health, Utilities, Education, Personal Care, Other. Use recall_memory to check what you already know about the user when relevant. Use save_memory when the user asks you to remember a fact, goal or preference. You can read data but never modify transactions. All money is INR; show amounts like Rs. 1,234. Keep replies short and friendly for chat."
+        }
+      }
+    },
+    {
+      "id": "llm",
+      "name": "Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        420
+      ],
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "query_transactions",
+      "name": "query_transactions",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        650,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Get exact spending totals, counts, averages and breakdowns. Use for ANY spending question.",
+        "method": "GET",
+        "url": "https://80.225.221.129.sslip.io/webhook/pfos-api/query?token=DASHBOARD_TOKEN",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "category",
+              "value": "{category}"
+            },
+            {
+              "name": "start_date",
+              "value": "{start_date}"
+            },
+            {
+              "name": "end_date",
+              "value": "{end_date}"
+            },
+            {
+              "name": "group_by",
+              "value": "{group_by}"
+            }
+          ]
+        },
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "category",
+              "description": "One of: Food & Dining, Transport, Groceries, Shopping, Entertainment, Health, Utilities, Education, Personal Care, Other. Empty for all.",
+              "type": "string"
+            },
+            {
+              "name": "start_date",
+              "description": "YYYY-MM-DD inclusive, empty for none",
+              "type": "string"
+            },
+            {
+              "name": "end_date",
+              "description": "YYYY-MM-DD inclusive, empty for none",
+              "type": "string"
+            },
+            {
+              "name": "group_by",
+              "description": "category, month, merchant, or empty",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "recall_memory",
+      "name": "recall_memory",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        820,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Recall facts/goals/preferences the user asked to remember.",
+        "method": "GET",
+        "url": "https://80.225.221.129.sslip.io/webhook/pfos-api/memory?token=DASHBOARD_TOKEN",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "q",
+              "value": "{q}"
+            }
+          ]
+        },
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "q",
+              "description": "keyword filter, empty for all",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "save_memory",
+      "name": "save_memory",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        990,
+        420
+      ],
+      "parameters": {
+        "toolDescription": "Save a fact/goal/preference to remember for the future.",
+        "method": "POST",
+        "url": "https://80.225.221.129.sslip.io/webhook/pfos-api/memory?token=DASHBOARD_TOKEN",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "parametersBody": {
+          "values": [
+            {
+              "name": "note",
+              "value": "{note}"
+            },
+            {
+              "name": "tags",
+              "value": "{tags}"
+            }
+          ]
+        },
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "note",
+              "description": "the fact to remember",
+              "type": "string"
+            },
+            {
+              "name": "tags",
+              "description": "comma tags",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendagent",
+      "name": "Send Agent Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        200
+      ],
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $('AI Agent').first().json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "2da47c8c-7d3f-425b-bba8-3fe37fb49239"
     }
   ],
   "connections": {
@@ -230,7 +466,36 @@
       "main": [
         [
           {
+            "node": "Classify Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Intent": {
+      "main": [
+        [
+          {
+            "node": "Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
             "node": "Build Gemini Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
             "type": "main",
             "index": 0
           }
@@ -298,6 +563,61 @@
           }
         ]
       ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Agent Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query_transactions": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "recall_memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -307,383 +627,6 @@
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   },
-  "staticData": null,
-  "meta": null,
-  "nodeGroups": [],
-  "pinData": {},
-  "versionId": "eb158eda-81ee-492d-9d85-cc67bf74256f",
-  "activeVersionId": "eb158eda-81ee-492d-9d85-cc67bf74256f",
-  "versionCounter": 22,
-  "triggerCount": 1,
-  "sourceWorkflowId": null,
-  "shared": [
-    {
-      "updatedAt": "2026-06-23T07:23:48.015Z",
-      "createdAt": "2026-06-23T07:23:48.015Z",
-      "role": "workflow:owner",
-      "workflowId": "afbbb7be",
-      "projectId": "wl7aC2m7FvCJxKAg",
-      "project": {
-        "updatedAt": "2026-06-23T07:18:26.297Z",
-        "createdAt": "2026-06-23T07:07:22.021Z",
-        "id": "wl7aC2m7FvCJxKAg",
-        "name": "Adarsh Yadav <addy.yadav178@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "customTelemetryTags": [],
-        "creatorId": "8e89af37-cb4b-4496-8aac-d1df670fc7f1"
-      }
-    }
-  ],
-  "tags": [
-    {
-      "updatedAt": "2026-06-23T07:23:48.030Z",
-      "createdAt": "2026-06-23T07:23:48.030Z",
-      "id": "5zuJ6CZyJJv7eSO4",
-      "name": "Phase 1"
-    },
-    {
-      "updatedAt": "2026-06-23T07:23:48.025Z",
-      "createdAt": "2026-06-23T07:23:48.025Z",
-      "id": "Sc7mL1tBjymj1hc5",
-      "name": "PFOS"
-    }
-  ],
-  "parentFolder": null,
-  "activeVersion": {
-    "updatedAt": "2026-06-23T08:23:59.432Z",
-    "createdAt": "2026-06-23T08:23:59.432Z",
-    "versionId": "eb158eda-81ee-492d-9d85-cc67bf74256f",
-    "workflowId": "afbbb7be",
-    "nodes": [
-      {
-        "parameters": {
-          "updates": [
-            "message"
-          ],
-          "additionalFields": {}
-        },
-        "id": "a1b2c3d4-1111-4000-8000-000000000001",
-        "name": "Telegram Trigger",
-        "type": "n8n-nodes-base.telegramTrigger",
-        "typeVersion": 1.1,
-        "position": [
-          0,
-          300
-        ],
-        "webhookId": "pfos-w1-capture",
-        "credentials": {
-          "telegramApi": {
-            "id": "jLPst9yOtbDN1eBi",
-            "name": "PFOS Telegram Bot"
-          }
-        }
-      },
-      {
-        "id": "build-gemini-body",
-        "name": "Build Gemini Body",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          250,
-          300
-        ],
-        "parameters": {
-          "jsCode": "const msg = $input.first().json.message.text || '';\nconst prompt = \"You are a personal finance assistant. Extract expense details from the user message and return ONLY a JSON object, no other text, no markdown.\\n\\nCategories (use exactly as written):\\nFood & Dining, Transport, Groceries, Shopping, Entertainment, Health, Utilities, Education, Personal Care, Other\\n\\nReturn JSON with:\\n- amount: number\\n- merchant: cleaned name\\n- category: from list above\\n- need_or_want: Need or Want\\n- confidence: 0.0 to 1.0\\n\\nExamples:\\n\\\"450 swiggy\\\" -> {\\\"amount\\\":450,\\\"merchant\\\":\\\"Swiggy\\\",\\\"category\\\":\\\"Food & Dining\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":0.95}\\n\\\"uber 85\\\" -> {\\\"amount\\\":85,\\\"merchant\\\":\\\"Uber\\\",\\\"category\\\":\\\"Transport\\\",\\\"need_or_want\\\":\\\"Need\\\",\\\"confidence\\\":1.0}\\n\\\"Netflix 649\\\" -> {\\\"amount\\\":649,\\\"merchant\\\":\\\"Netflix\\\",\\\"category\\\":\\\"Entertainment\\\",\\\"need_or_want\\\":\\\"Want\\\",\\\"confidence\\\":1.0}\\n\\nMessage: \\\"REPLACE_MESSAGE\\\"\\n\\nReturn only the JSON object.\".replace('REPLACE_MESSAGE', msg);\nreturn [{ json: { body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) } }];\n"
-        }
-      },
-      {
-        "id": "call-gemini",
-        "name": "Call Gemini",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          500,
-          300
-        ],
-        "parameters": {
-          "method": "POST",
-          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=GEMINI_API_KEY",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          },
-          "sendBody": true,
-          "contentType": "raw",
-          "rawContentType": "application/json",
-          "body": "={{ $json.body }}"
-        }
-      },
-      {
-        "id": "parse-gemini",
-        "name": "Parse Gemini Response",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          750,
-          300
-        ],
-        "parameters": {
-          "jsCode": "\nconst raw = $input.first().json;\nconst text = (raw.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g,'').trim();\nlet parsed;\ntry { parsed = JSON.parse(text); } catch(e) {\n  return [{ json: { parseSuccess: false, error: 'Bad JSON: ' + text.slice(0,100) } }];\n}\nconst amount = parseFloat(parsed.amount);\nif (!amount || isNaN(amount)) {\n  return [{ json: { parseSuccess: false, error: 'No valid amount' } }];\n}\nconst now = new Date();\nconst transaction_id = 'TXN-' + now.getFullYear() +\n  String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' +\n  String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') +\n  String(now.getSeconds()).padStart(2,'0');\nconst month_key = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');\nconst confidence = parsed.confidence ?? 0;\nreturn [{ json: {\n  parseSuccess: true,\n  confidence,\n  transaction_id,\n  timestamp: now.toISOString(),\n  raw_message: $('Telegram Trigger').first().json.message.text,\n  amount,\n  merchant_vendor: parsed.merchant || 'Unknown',\n  category: parsed.category || 'Other',\n  subcategory: '',\n  need_or_want: parsed.need_or_want || 'Want',\n  payment_mode: 'Unspecified',\n  confidence_score: confidence,\n  user_corrected: false,\n  month_key,\n  source: 'telegram_text'\n}}];\n"
-        }
-      },
-      {
-        "id": "confidence-check",
-        "name": "Confidence OK?",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2,
-        "position": [
-          1000,
-          300
-        ],
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": ""
-            },
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "c1",
-                "leftValue": "={{ $json.parseSuccess }}",
-                "rightValue": true,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "equals"
-                }
-              },
-              {
-                "id": "c2",
-                "leftValue": "={{ $json.confidence }}",
-                "rightValue": 0.7,
-                "operator": {
-                  "type": "number",
-                  "operation": "gte"
-                }
-              }
-            ]
-          }
-        }
-      },
-      {
-        "parameters": {
-          "operation": "append",
-          "documentId": {
-            "__rl": true,
-            "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
-            "mode": "id"
-          },
-          "sheetName": {
-            "__rl": true,
-            "value": 1585632130,
-            "mode": "list",
-            "cachedResultName": "Transactions_headers",
-            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
-          },
-          "columns": {
-            "mappingMode": "autoMapInputData",
-            "value": {}
-          },
-          "options": {}
-        },
-        "id": "a1b2c3d4-1111-4000-8000-000000000006",
-        "name": "Write to Transactions",
-        "type": "n8n-nodes-base.googleSheets",
-        "typeVersion": 4.5,
-        "position": [
-          1250,
-          200
-        ],
-        "credentials": {
-          "googleSheetsOAuth2Api": {
-            "id": "gXsH8dHxMbdv15oe",
-            "name": "PFOS Google Sheets"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
-          "text": "=\u2705 \u20b9{{ $('Parse Gemini Response').first().json.amount }} logged\n\n\ud83c\udfea {{ $('Parse Gemini Response').first().json.merchant_vendor }}\n\ud83d\udcc2 {{ $('Parse Gemini Response').first().json.category }} ({{ $('Parse Gemini Response').first().json.need_or_want }})\n\ud83c\udfaf {{ Math.round($('Parse Gemini Response').first().json.confidence * 100) }}% confidence",
-          "additionalFields": {}
-        },
-        "id": "a1b2c3d4-1111-4000-8000-000000000007",
-        "name": "Send Confirmation",
-        "type": "n8n-nodes-base.telegram",
-        "typeVersion": 1.2,
-        "position": [
-          1500,
-          200
-        ],
-        "webhookId": "a0ee6745-caf1-4e1a-ac6d-bcf6d6293e8c",
-        "credentials": {
-          "telegramApi": {
-            "id": "jLPst9yOtbDN1eBi",
-            "name": "PFOS Telegram Bot"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
-          "text": "=\ud83e\udd14 Not confident about that one.\n\nI guessed: {{ $('Parse Gemini Response').first().json.category }} ({{ Math.round($('Parse Gemini Response').first().json.confidence_score * 100) }}%)\n\nPlease resend with more detail:\n\u2022 450 Swiggy food delivery\n\u2022 200 auto fare",
-          "additionalFields": {}
-        },
-        "id": "phase2-low-confidence-reply",
-        "name": "Send Low Confidence Reply",
-        "type": "n8n-nodes-base.telegram",
-        "typeVersion": 1.2,
-        "position": [
-          1250,
-          450
-        ],
-        "webhookId": "11804363-7e0d-4f6b-a411-249577bb9c38",
-        "credentials": {
-          "telegramApi": {
-            "id": "jLPst9yOtbDN1eBi",
-            "name": "PFOS Telegram Bot"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
-          "text": "=\u274c Couldn't understand that.\n\nTry:\n\u2022 450 Swiggy\n\u2022 Uber 200\n\u2022 300 electricity bill",
-          "additionalFields": {}
-        },
-        "id": "phase2-error-reply",
-        "name": "Send Error Reply",
-        "type": "n8n-nodes-base.telegram",
-        "typeVersion": 1.2,
-        "position": [
-          1250,
-          600
-        ],
-        "webhookId": "11804363-7e0d-4f6b-a411-249577bb9c38",
-        "credentials": {
-          "telegramApi": {
-            "id": "jLPst9yOtbDN1eBi",
-            "name": "PFOS Telegram Bot"
-          }
-        }
-      }
-    ],
-    "connections": {
-      "Telegram Trigger": {
-        "main": [
-          [
-            {
-              "node": "Build Gemini Body",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Build Gemini Body": {
-        "main": [
-          [
-            {
-              "node": "Call Gemini",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Call Gemini": {
-        "main": [
-          [
-            {
-              "node": "Parse Gemini Response",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Parse Gemini Response": {
-        "main": [
-          [
-            {
-              "node": "Confidence OK?",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Confidence OK?": {
-        "main": [
-          [
-            {
-              "node": "Write to Transactions",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Send Low Confidence Reply",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Write to Transactions": {
-        "main": [
-          [
-            {
-              "node": "Send Confirmation",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "nodeGroups": [],
-    "authors": "Adarsh Yadav",
-    "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-06-23T08:24:01.813Z",
-        "id": 16,
-        "workflowId": "afbbb7be",
-        "versionId": "eb158eda-81ee-492d-9d85-cc67bf74256f",
-        "event": "activated",
-        "userId": "8e89af37-cb4b-4496-8aac-d1df670fc7f1"
-      }
-    ]
-  },
-  "scopes": [
-    "execution:reveal",
-    "workflow:create",
-    "workflow:delete",
-    "workflow:disableRedaction",
-    "workflow:enableRedaction",
-    "workflow:execute",
-    "workflow:execute-chat",
-    "workflow:export",
-    "workflow:import",
-    "workflow:list",
-    "workflow:move",
-    "workflow:publish",
-    "workflow:read",
-    "workflow:share",
-    "workflow:unpublish",
-    "workflow:unshare",
-    "workflow:update"
-  ],
-  "checksum": "65922811d2cdd2424fe5ad8ef6a06580e0ca350f1acdbcc7da2401182ac9429f"
+  "active": false,
+  "pinData": {}
 }
