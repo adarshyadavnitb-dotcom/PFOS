@@ -1,0 +1,341 @@
+{
+  "name": "W4 \u2014 Monthly Coach",
+  "nodes": [
+    {
+      "id": "w4-schedule",
+      "name": "1st of Month 10 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "monthsInterval": 1,
+              "triggerAtDayOfMonth": 1,
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "w4-read",
+      "name": "Read Transactions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1585632130,
+          "mode": "list",
+          "cachedResultName": "Transactions_headers",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=1585632130"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "w4-aggregate",
+      "name": "Aggregate Month",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst rows = $input.all().map(i=>i.json);\nconst istOffset = 5.5*60*60*1000;\nconst INCOME = 140700;\nconst TEST_TARGET = \"\";\nconst MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];\n\nconst now = new Date();\nconst nowIST = new Date(now.getTime()+istOffset);\nlet ty = nowIST.getUTCFullYear();\nlet tmIdx = nowIST.getUTCMonth() - 1;   // previous calendar month\nif(tmIdx < 0){ tmIdx = 11; ty -= 1; }\nlet targetKey = ty + '-' + String(tmIdx+1).padStart(2,'0');\n\nif(TEST_TARGET){\n  targetKey = TEST_TARGET;\n  ty = parseInt(TEST_TARGET.split('-')[0]);\n  tmIdx = parseInt(TEST_TARGET.split('-')[1]) - 1;\n}\n\nlet py = ty, pmIdx = tmIdx - 1;\nif(pmIdx < 0){ pmIdx = 11; py -= 1; }\nconst priorKey = py + '-' + String(pmIdx+1).padStart(2,'0');\nconst month_name = MONTHS[tmIdx] + ' ' + ty;\n\nconst mkey = r => {\n  if(r.month_key) return r.month_key;\n  if(!r.timestamp) return null;\n  const t = new Date(r.timestamp);\n  if(isNaN(t.getTime())) return null;\n  const ist = new Date(t.getTime()+istOffset);\n  return ist.getUTCFullYear()+'-'+String(ist.getUTCMonth()+1).padStart(2,'0');\n};\n\nconst target = rows.filter(r => mkey(r)===targetKey);\nconst prior  = rows.filter(r => mkey(r)===priorKey);\n\nif(target.length===0){\n  return [{ json: { hasData:false, month_key: targetKey,\n    noDataText: `\ud83c\udfaf Monthly Report \u2014 ${month_name}\\n\\nNo expenses were logged in ${month_name}. Nothing to report this month.` }}];\n}\n\nconst sum = a => a.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);\nconst total_spend = Math.round(sum(target));\nconst prior_spend = Math.round(sum(prior));\nconst total_income = INCOME;\nconst savings = total_income - total_spend;\nconst savings_rate = total_income>0 ? Math.round(savings/total_income*100) : 0;\nconst mom_change_pct = prior_spend>0 ? Math.round((total_spend-prior_spend)/prior_spend*100) : null;\n\nconst cat={};\nfor(const r of target){ const c=r.category||'Uncategorized'; cat[c]=(cat[c]||0)+(parseFloat(r.amount)||0); }\nconst category_breakdown = Object.entries(cat).sort((a,b)=>b[1]-a[1])\n  .map(([category,amount])=>({category, amount:Math.round(amount), pct: total_spend>0?Math.round(amount/total_spend*100):0}));\nconst top3 = category_breakdown.slice(0,3);\nconst top_3_leaks = top3.map(c=>`${c.category} \u20b9${c.amount} (${c.pct}%)`).join('; ');\n\nconst needTotal = sum(target.filter(r=>(r.need_or_want||'').toLowerCase()==='need'));\nconst need_pct = total_spend>0 ? Math.round(needTotal/total_spend*100):0;\n\nconst stats = {\n  month_key: targetKey, month_name, total_income, total_spend, prior_spend,\n  savings, savings_rate, mom_change_pct, need_pct, want_pct: 100-need_pct,\n  category_breakdown, top_3_leaks, transaction_count: target.length\n};\nreturn [{ json: { hasData:true, ...stats, statsJson: JSON.stringify(stats) } }];\n"
+      }
+    },
+    {
+      "id": "w4-hasdata",
+      "name": "Has Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "hd",
+              "leftValue": "={{ $json.hasData }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "w4-build",
+      "name": "Build Gemini Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const s = $json.statsJson;\nconst prompt = \"You are an experienced, supportive personal finance coach writing a monthly report over Telegram.\\n\\nYou are given PRE-COMPUTED statistics. Do NOT recalculate or invent any numbers. Only narrate the numbers provided.\\n\\nWrite a monthly coaching report. Structure:\\n1. Headline: month, total spend, and savings rate.\\n2. Money flow: income, spent, saved (savings rate %). One line on month-over-month spend change if available.\\n3. Top spending areas (the leaks) with amounts and % of spend - 3 bullets.\\n4. Needs vs wants split, one line.\\n5. 2-3 specific, actionable, encouraging recommendations grounded in the actual numbers (reference real categories/amounts).\\n\\nRules:\\n- Under 200 words.\\n- No markdown formatting (no asterisks, underscores, bold). Plain text only.\\n- Use the bullet character \\u2022 for lists and \\u20b9 for amounts.\\n- Warm, motivating, concrete - not generic.\\n\\nStats (JSON):\\n\" + s + '\\n\\nWrite only the Telegram message text, no preamble.';\nreturn [{ json: { body: JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.7} }) } }];\n"
+      }
+    },
+    {
+      "id": "w4-gemini",
+      "name": "Call Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=GEMINI_API_KEY",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "w4-assemble",
+      "name": "Assemble Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        200
+      ],
+      "parameters": {
+        "jsCode": "\nconst raw = $input.first().json;\nlet narrative = (raw.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();\nconst a = $('Aggregate Month').first().json;\nif(!narrative){\n  narrative = `\ud83c\udfaf Monthly Report \u2014 ${a.month_name}\\nSpent \u20b9${a.total_spend} of \u20b9${a.total_income} income (saved ${a.savings_rate}%)`;\n}\nreturn [{ json: {\n  month_key: a.month_key,\n  total_income: a.total_income,\n  total_spend: a.total_spend,\n  savings_rate: a.savings_rate,\n  mom_change_pct: (a.mom_change_pct===null || a.mom_change_pct===undefined) ? 'N/A' : a.mom_change_pct,\n  top_3_leaks: a.top_3_leaks,\n  recommendations: narrative,\n  report_sent: true\n}}];\n"
+      }
+    },
+    {
+      "id": "w4-write",
+      "name": "Write to MonthlyReports",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1750,
+        200
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 13580699,
+          "mode": "list",
+          "cachedResultName": "MonthlyReports",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XFAIReY1eIcNkJGvVBOonMDhwcydFmD6NBTNOodxSWM/edit#gid=13580699"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "id": "w4-send",
+      "name": "Send Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        200
+      ],
+      "parameters": {
+        "chatId": "TELEGRAM_CHAT_ID",
+        "text": "={{ $('Assemble Row').first().json.recommendations }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "8cb87db1-e48c-49fb-ad33-664d07f50e2f"
+    },
+    {
+      "id": "w4-nodata",
+      "name": "Send No-Data Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        450
+      ],
+      "parameters": {
+        "chatId": "TELEGRAM_CHAT_ID",
+        "text": "={{ $('Aggregate Month').first().json.noDataText }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": ""
+        }
+      },
+      "webhookId": "df82f3a5-02d6-403f-91ba-665404b5efa5"
+    }
+  ],
+  "connections": {
+    "1st of Month 10 AM": {
+      "main": [
+        [
+          {
+            "node": "Read Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Transactions": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Month",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month": {
+      "main": [
+        [
+          {
+            "node": "Has Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Data?": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send No-Data Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gemini Body": {
+      "main": [
+        [
+          {
+            "node": "Call Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini": {
+      "main": [
+        [
+          {
+            "node": "Assemble Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Row": {
+      "main": [
+        [
+          {
+            "node": "Write to MonthlyReports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to MonthlyReports": {
+      "main": [
+        [
+          {
+            "node": "Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {}
+}
