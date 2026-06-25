@@ -14,10 +14,14 @@ body,
 
 body {
   margin: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+  font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
   color: #0f172a;
   background-color: #f5f5f7;
+  letter-spacing: -0.01em;
 }
 
 body::before {
@@ -44,11 +48,16 @@ html.dark body::before {
 
 @layer components {
   .glass {
-    @apply rounded-[22px] border border-black/[0.06] bg-white/90 shadow-sm shadow-black/[0.04]
-           dark:border-white/10 dark:bg-[#1c1c1e] dark:shadow-black/20;
+    @apply rounded-[22px] border border-black/[0.06] bg-white/[0.92]
+           shadow-[0_2px_20px_-4px_rgba(0,60,120,0.07),0_1px_4px_-1px_rgba(0,0,0,0.04)]
+           dark:border-white/[0.08] dark:bg-[#1c1c1e]
+           dark:shadow-[0_2px_20px_-4px_rgba(0,0,0,0.4),0_1px_4px_-1px_rgba(0,0,0,0.3)];
   }
   .glass-hover {
-    @apply transition-colors duration-200 hover:border-blue-500/35 dark:hover:border-blue-400/35;
+    @apply transition-all duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+           hover:border-blue-500/30 hover:shadow-[0_4px_24px_-4px_rgba(0,60,120,0.12),0_1px_6px_-1px_rgba(0,0,0,0.06)]
+           dark:hover:border-blue-400/25
+           dark:hover:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5),0_1px_6px_-1px_rgba(0,0,0,0.35)];
   }
   .pill {
     @apply rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all duration-200;
@@ -62,13 +71,17 @@ html.dark body::before {
   }
   .btn-primary {
     @apply inline-flex items-center gap-2 rounded-full bg-blue-500
-           px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/25
-           transition-all duration-200 hover:bg-blue-600 active:scale-[0.98]
-           disabled:cursor-not-allowed disabled:opacity-60;
+           px-4 py-2.5 text-sm font-semibold text-white
+           shadow-[0_1px_8px_-2px_rgba(0,122,255,0.35)]
+           transition-all duration-[250ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+           hover:bg-blue-600 hover:shadow-[0_2px_12px_-2px_rgba(0,122,255,0.5)]
+           active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60;
   }
   .btn-ghost {
     @apply inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/70 px-4 py-2.5
-           text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-white/80 active:scale-[0.98]
+           text-sm font-semibold text-slate-700
+           transition-all duration-[250ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
+           hover:bg-white/90 hover:border-black/[0.12] active:scale-[0.97]
            dark:border-white/10 dark:bg-white/[0.07] dark:text-slate-200 dark:hover:bg-white/[0.12];
   }
   .input {

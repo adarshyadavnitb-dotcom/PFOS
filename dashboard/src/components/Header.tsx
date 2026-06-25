@@ -18,14 +18,14 @@ export function Header({
   return (
     <header className="mb-7 flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/30">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-500 shadow-[0_2px_12px_-2px_rgba(0,122,255,0.45)]">
           <span className="text-lg font-extrabold text-white">₹</span>
         </div>
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">
-            PFOS · Wealth Dashboard
+          <h1 className="text-[1.1rem] font-extrabold tracking-tight text-slate-800 dark:text-white">
+            PFOS Wealth Dashboard
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
             Personal Finance Operating System
           </p>
         </div>
@@ -33,13 +33,14 @@ export function Header({
 
       <div className="flex items-center gap-2.5">
         <span
-          className={`pill ${
+          className={`pill flex items-center gap-1.5 ${
             mode === "live"
-              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-              : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+              : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
           }`}
         >
-          {mode === "live" ? "● Live data" : "● Demo data"}
+          <span className={`h-1.5 w-1.5 rounded-full ${mode === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
+          {mode === "live" ? "Live data" : "Demo data"}
         </span>
 
         {mode === "demo" ? (

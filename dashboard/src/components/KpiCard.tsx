@@ -1,47 +1,53 @@
 import { motion } from "framer-motion";
 import { ReactNode } from "react";
 
+const ACCENTS: Record<string, { bg: string; text: string }> = {
+  blue:    { bg: "bg-blue-500/12 dark:bg-blue-400/15",    text: "text-blue-500 dark:text-blue-400" },
+  indigo:  { bg: "bg-indigo-500/12 dark:bg-indigo-400/15", text: "text-indigo-500 dark:text-indigo-400" },
+  emerald: { bg: "bg-emerald-500/12 dark:bg-emerald-400/15", text: "text-emerald-600 dark:text-emerald-400" },
+  amber:   { bg: "bg-amber-500/12 dark:bg-amber-400/15",  text: "text-amber-600 dark:text-amber-400" },
+  rose:    { bg: "bg-rose-500/12 dark:bg-rose-400/15",    text: "text-rose-500 dark:text-rose-400" },
+  cyan:    { bg: "bg-cyan-500/12 dark:bg-cyan-400/15",    text: "text-cyan-600 dark:text-cyan-400" },
+  violet:  { bg: "bg-violet-500/12 dark:bg-violet-400/15", text: "text-violet-500 dark:text-violet-400" },
+};
+
 export function KpiCard({
   label,
   value,
   sub,
   icon,
-  accent = "violet",
+  accent = "blue",
   delay = 0,
 }: {
   label: string;
   value: string;
   sub?: string;
   icon: ReactNode;
-  accent?: "violet" | "cyan" | "emerald" | "amber" | "rose";
+  accent?: keyof typeof ACCENTS;
   delay?: number;
 }) {
-  const accents: Record<string, string> = {
-    violet: "from-violet-500/20 to-violet-500/5 text-violet-500",
-    cyan: "from-cyan-500/20 to-cyan-500/5 text-cyan-500",
-    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-500",
-    amber: "from-amber-500/20 to-amber-500/5 text-amber-500",
-    rose: "from-rose-500/20 to-rose-500/5 text-rose-500",
-  };
+  const a = ACCENTS[accent] ?? ACCENTS.blue;
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
+      transition={{ duration: 0.4, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="glass glass-hover p-5"
     >
       <div className="flex items-start justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
           {label}
         </span>
-        <span className={`grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${accents[accent]}`}>
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl ${a.bg} ${a.text}`}>
           {icon}
         </span>
       </div>
-      <div className="mt-3 text-2xl font-extrabold tracking-tight text-slate-800 dark:text-white">
+      <div className="mt-3 text-[1.65rem] font-extrabold leading-none tracking-tight text-slate-800 dark:text-white">
         {value}
       </div>
-      {sub && <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sub}</div>}
+      {sub && (
+        <div className="mt-1.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">{sub}</div>
+      )}
     </motion.div>
   );
 }
