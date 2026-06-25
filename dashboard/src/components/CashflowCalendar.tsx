@@ -4,10 +4,10 @@ import { inr, inrCompact } from "../lib/format";
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function dayTone(spend: number, dailyBudget: number) {
-  if (spend === 0) return "bg-black/[0.025] text-slate-500 dark:bg-[#2c2c2e] dark:text-slate-200";
-  if (dailyBudget === 0 || spend <= dailyBudget) return "bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200";
-  if (spend <= dailyBudget * 1.5) return "bg-amber-500/15 text-amber-700 dark:bg-amber-400/14 dark:text-amber-200";
-  return "bg-rose-500/15 text-rose-700 dark:bg-rose-400/14 dark:text-rose-200";
+  if (spend === 0) return "bg-black/[0.025] text-slate-400 dark:bg-white/[0.03] dark:text-slate-500";
+  if (dailyBudget === 0 || spend <= dailyBudget) return "bg-emerald-500/[0.10] text-emerald-700 dark:bg-emerald-400/[0.12] dark:text-emerald-300";
+  if (spend <= dailyBudget * 1.5) return "bg-amber-500/[0.12] text-amber-700 dark:bg-amber-400/[0.12] dark:text-amber-300";
+  return "bg-rose-500/[0.14] text-rose-700 dark:bg-rose-400/[0.12] dark:text-rose-300";
 }
 
 export function CashflowCalendar({ status }: { status: CashflowCalendarStatus }) {
@@ -61,18 +61,18 @@ export function CashflowCalendar({ status }: { status: CashflowCalendarStatus })
       </div>
 
       <div className="space-y-3">
-        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-[#2c2c2e]">
+        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-white/[0.05]">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Income</div>
           <div className="mt-1 text-xl font-extrabold text-slate-900 dark:text-white">{inr(status.income)}</div>
         </div>
-        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-[#2c2c2e]">
+        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-white/[0.05]">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Projected spend</div>
           <div className="mt-1 text-xl font-extrabold text-slate-900 dark:text-white">{inr(status.projectedSpend)}</div>
           <div className={`mt-1 text-xs font-semibold ${status.projectedSavings >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
             {status.projectedSavings >= 0 ? `${inr(status.projectedSavings)} projected savings` : `${inr(Math.abs(status.projectedSavings))} projected shortfall`}
           </div>
         </div>
-        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-[#2c2c2e]">
+        <div className="rounded-2xl bg-black/[0.03] p-4 dark:bg-white/[0.05]">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hot days</div>
           <div className="mt-2 space-y-2">
             {status.highSpendDays.length === 0 ? (

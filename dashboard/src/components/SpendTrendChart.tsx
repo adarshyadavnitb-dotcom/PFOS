@@ -10,11 +10,12 @@ export function SpendTrendChart({ data }: { data: SeriesPoint[] }) {
       <AreaChart data={data} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
         <defs>
           <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.45} />
-            <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="#007aff" stopOpacity={0.35} />
+            <stop offset="70%" stopColor="#007aff" stopOpacity={0.06} />
+            <stop offset="100%" stopColor="#007aff" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.10)" vertical={false} />
         <XAxis
           dataKey="label"
           tick={{ fontSize: 11, fill: "rgb(148 163 184)" }}
@@ -29,15 +30,15 @@ export function SpendTrendChart({ data }: { data: SeriesPoint[] }) {
           width={48}
           tickFormatter={(v) => inrCompact(v)}
         />
-        <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(139,92,246,0.4)" }} />
+        <Tooltip content={<ChartTooltip />} cursor={{ stroke: "rgba(0,122,255,0.3)", strokeWidth: 1.5 }} />
         <Area
           type="monotone"
           dataKey="amount"
-          stroke="#8b5cf6"
+          stroke="#007aff"
           strokeWidth={2.5}
           fill="url(#spendFill)"
           dot={false}
-          activeDot={{ r: 4, fill: "#a78bfa" }}
+          activeDot={{ r: 5, fill: "#007aff", stroke: "#fff", strokeWidth: 2 }}
         />
       </AreaChart>
     </ResponsiveContainer>
