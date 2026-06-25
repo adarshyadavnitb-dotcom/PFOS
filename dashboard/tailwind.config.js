@@ -9,8 +9,8 @@ export default {
       },
       colors: {
         brand: {
-          DEFAULT: "#8b5cf6",
-          glow: "#a78bfa",
+          DEFAULT: "#007aff",
+          glow: "#5ac8fa",
         },
       },
       keyframes: {

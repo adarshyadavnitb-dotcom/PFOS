@@ -1,4 +1,4 @@
-import { RangeKey, Txn } from "../types";
+import { Budget, CATEGORIES, RangeKey, Txn } from "../types";
 import { parseDate, shortDate } from "./format";
 
 export function rangeStart(range: RangeKey, now = new Date()): Date {
@@ -40,6 +40,19 @@ export function applyCategoryFilter(txns: Txn[], active: Set<string>): Txn[] {
 }
 
 const sum = (txns: Txn[]) => txns.reduce((s, t) => s + (t.amount || 0), 0);
+
+const DEFAULT_BUDGET_WEIGHTS: Record<string, number> = {
+  "Food & Dining": 0.1,
+  Transport: 0.05,
+  Groceries: 0.09,
+  Shopping: 0.07,
+  Entertainment: 0.03,
+  Health: 0.04,
+  Utilities: 0.05,
+  Education: 0.03,
+  "Personal Care": 0.02,
+  Other: 0.03,
+};
 
 export interface Kpis {
   totalSpend: number;
@@ -83,6 +96,192 @@ export function categoryBreakdown(txns: Txn[]): CatSlice[] {
   return [...m.entries()]
     .map(([category, amount]) => ({ category, amount }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+export interface BudgetRow {
+  category: string;
+  budget: number;
+  actual: number;
+  remaining: number;
+  usedPct: number;
+}
+
+export interface BudgetStatus {
+  rows: BudgetRow[];
+  totalBudget: number;
+  totalActual: number;
+  remaining: number;
+  usedPct: number;
+  pacePct: number;
+  projectedSpend: number;
+}
+
+export interface SafeToSpendStatus {
+  dailySafeSpend: number;
+  daysRemaining: number;
+  monthRemaining: number;
+  projectedDelta: number;
+  categoryToWatch?: BudgetRow;
+}
+
+export interface CashflowDay {
+  date: string;
+  day: number;
+  weekday: number;
+  spend: number;
+  isToday: boolean;
+  isFuture: boolean;
+  isPayday: boolean;
+  paceDelta: number;
+}
+
+export interface CashflowCalendarStatus {
+  monthLabel: string;
+  days: CashflowDay[];
+  leadingBlanks: number;
+  totalSpend: number;
+  totalBudget: number;
+  dailyBudget: number;
+  income: number;
+  projectedSpend: number;
+  projectedSavings: number;
+  highSpendDays: CashflowDay[];
+}
+
+export function monthlyBudgets(budgets: Budget[] | undefined, income: number): Budget[] {
+  const explicit = (budgets || [])
+    .map((b) => ({
+      category: b.category || "Other",
+      monthly_limit: Math.max(0, Number(b.monthly_limit) || 0),
+    }))
+    .filter((b) => b.monthly_limit > 0);
+
+  if (explicit.length > 0) return explicit;
+
+  return CATEGORIES.map((category) => ({
+    category,
+    monthly_limit: Math.round((income || 0) * (DEFAULT_BUDGET_WEIGHTS[category] || 0.02)),
+  })).filter((b) => b.monthly_limit > 0);
+}
+
+export function budgetStatus(txns: Txn[], budgets: Budget[], now = new Date()): BudgetStatus {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const monthTxns = txns.filter((t) => {
+    const ms = parseDate(t.date).getTime();
+    return !isNaN(ms) && ms >= monthStart.getTime() && ms <= monthEnd.getTime();
+  });
+
+  const actualByCategory = new Map(categoryBreakdown(monthTxns).map((c) => [c.category, c.amount]));
+  const budgetByCategory = new Map<string, number>();
+  for (const b of budgets) {
+    budgetByCategory.set(b.category, (budgetByCategory.get(b.category) || 0) + (b.monthly_limit || 0));
+  }
+
+  const categories = new Set([...budgetByCategory.keys(), ...actualByCategory.keys()]);
+  const rows = [...categories]
+    .map((category) => {
+      const budget = budgetByCategory.get(category) || 0;
+      const actual = actualByCategory.get(category) || 0;
+      return {
+        category,
+        budget,
+        actual,
+        remaining: budget - actual,
+        usedPct: budget > 0 ? Math.round((actual / budget) * 100) : actual > 0 ? 100 : 0,
+      };
+    })
+    .sort((a, b) => {
+      const aOver = a.remaining < 0 ? 1 : 0;
+      const bOver = b.remaining < 0 ? 1 : 0;
+      return bOver - aOver || b.usedPct - a.usedPct || b.actual - a.actual;
+    });
+
+  const totalBudget = rows.reduce((s, r) => s + r.budget, 0);
+  const totalActual = rows.reduce((s, r) => s + r.actual, 0);
+  const elapsedDays = now.getDate();
+  const daysInMonth = monthEnd.getDate();
+  const pacePct = Math.round((elapsedDays / daysInMonth) * 100);
+  const projectedSpend = elapsedDays > 0 ? Math.round((totalActual / elapsedDays) * daysInMonth) : totalActual;
+
+  return {
+    rows,
+    totalBudget,
+    totalActual,
+    remaining: totalBudget - totalActual,
+    usedPct: totalBudget > 0 ? Math.round((totalActual / totalBudget) * 100) : 0,
+    pacePct,
+    projectedSpend,
+  };
+}
+
+export function safeToSpendStatus(status: BudgetStatus, now = new Date()): SafeToSpendStatus {
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysRemaining = Math.max(daysInMonth - now.getDate() + 1, 1);
+  const monthRemaining = Math.max(status.remaining, 0);
+  const dailySafeSpend = Math.floor(monthRemaining / daysRemaining);
+  const projectedDelta = status.totalBudget - status.projectedSpend;
+  const categoryToWatch = status.rows.find((r) => r.remaining < 0) || status.rows.find((r) => r.usedPct > status.pacePct);
+
+  return {
+    dailySafeSpend,
+    daysRemaining,
+    monthRemaining,
+    projectedDelta,
+    categoryToWatch,
+  };
+}
+
+export function cashflowCalendarStatus(
+  txns: Txn[],
+  budget: BudgetStatus,
+  income: number,
+  now = new Date()
+): CashflowCalendarStatus {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dailyBudget = daysInMonth > 0 ? Math.round(budget.totalBudget / daysInMonth) : 0;
+  const spendByDay = new Map<number, number>();
+
+  for (const t of txns) {
+    const d = parseDate(t.date);
+    if (isNaN(d.getTime())) continue;
+    if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) continue;
+    const day = d.getDate();
+    spendByDay.set(day, (spendByDay.get(day) || 0) + (t.amount || 0));
+  }
+
+  const todayKey = now.toDateString();
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), i + 1);
+    const spend = spendByDay.get(i + 1) || 0;
+    return {
+      date: d.toISOString(),
+      day: i + 1,
+      weekday: d.getDay(),
+      spend,
+      isToday: d.toDateString() === todayKey,
+      isFuture: d.getTime() > now.getTime(),
+      isPayday: i === 0 && income > 0,
+      paceDelta: spend - dailyBudget,
+    };
+  });
+
+  return {
+    monthLabel: monthStart.toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
+    days,
+    leadingBlanks: monthStart.getDay(),
+    totalSpend: budget.totalActual,
+    totalBudget: budget.totalBudget,
+    dailyBudget,
+    income,
+    projectedSpend: budget.projectedSpend,
+    projectedSavings: income - budget.projectedSpend,
+    highSpendDays: [...days]
+      .filter((d) => d.spend > dailyBudget * 1.25)
+      .sort((a, b) => b.spend - a.spend)
+      .slice(0, 3),
+  };
 }
 
 export function needWantSplit(txns: Txn[]): { need: number; want: number } {

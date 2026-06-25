@@ -10,8 +10,8 @@ export function CategoryDonut({ data }: { data: CatSlice[] }) {
   const chartData = data.map((d) => ({ name: d.category, value: d.amount }));
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <div className="relative h-[180px] w-[180px] shrink-0">
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative h-[160px] w-[160px] shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -38,7 +38,7 @@ export function CategoryDonut({ data }: { data: CatSlice[] }) {
         </div>
       </div>
 
-      <div className="w-full space-y-1.5">
+      <div className="w-full space-y-1.5 px-1">
         {data.slice(0, 6).map((d, i) => {
           const pct = total > 0 ? Math.round((d.amount / total) * 100) : 0;
           return (

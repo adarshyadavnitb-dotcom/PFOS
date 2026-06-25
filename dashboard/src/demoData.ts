@@ -54,6 +54,18 @@ function genTransactions(): Txn[] {
 
 export const DEMO_DATA: ApiData = {
   monthly_income: 145000,
+  budgets: [
+    { category: "Food & Dining", monthly_limit: 14500 },
+    { category: "Transport", monthly_limit: 7250 },
+    { category: "Groceries", monthly_limit: 13050 },
+    { category: "Shopping", monthly_limit: 10150 },
+    { category: "Entertainment", monthly_limit: 4350 },
+    { category: "Health", monthly_limit: 5800 },
+    { category: "Utilities", monthly_limit: 7250 },
+    { category: "Education", monthly_limit: 4350 },
+    { category: "Personal Care", monthly_limit: 2900 },
+    { category: "Other", monthly_limit: 4350 },
+  ],
   transactions: genTransactions(),
   latest_weekly_insight:
     "Weekly Money Insight 📈\n\nYour spending this week was ₹8,940, a touch above your ₹7,800 average.\n\n• Food & Dining led at ₹3,100 — a few extra weekend orders.\n• Groceries stayed steady at ₹2,400.\n\nTip: Try a two-day no-delivery streak next week to nudge dining back toward your average. You've got this!",

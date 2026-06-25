@@ -7,9 +7,15 @@ export interface Txn {
   month_key: string;
 }
 
+export interface Budget {
+  category: string;
+  monthly_limit: number;
+}
+
 export interface ApiData {
   monthly_income: number;
   transactions: Txn[];
+  budgets?: Budget[];
   latest_weekly_insight?: string;
   generated_at: string;
 }

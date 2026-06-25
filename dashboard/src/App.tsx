@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Wallet, Receipt, PiggyBank, Tag, Scale, Loader2, AlertCircle } from "lucide-react";
+import { Wallet, Receipt, PiggyBank, Tag, Scale, Loader2, AlertCircle, CalendarDays } from "lucide-react";
 
 import { ApiData, NewExpense, RangeKey, Txn } from "./types";
 import { DEMO_DATA } from "./demoData";
@@ -9,8 +9,12 @@ import {
   applyCategoryFilter,
   categoryBreakdown,
   computeKpis,
+  budgetStatus,
+  cashflowCalendarStatus,
   filterByRange,
+  monthlyBudgets,
   needWantSplit,
+  safeToSpendStatus,
   spendSeries,
   topMerchants,
 } from "./lib/aggregate";
@@ -25,6 +29,9 @@ import { SpendTrendChart } from "./components/SpendTrendChart";
 import { CategoryDonut } from "./components/CategoryDonut";
 import { NeedWantBar } from "./components/NeedWantBar";
 import { TopMerchants } from "./components/TopMerchants";
+import { BudgetVsActual } from "./components/BudgetVsActual";
+import { SafeToSpend } from "./components/SafeToSpend";
+import { CashflowCalendar } from "./components/CashflowCalendar";
 import { InsightCard } from "./components/InsightCard";
 import { ActionBar } from "./components/ActionBar";
 import { QuickAddModal } from "./components/QuickAddModal";
@@ -194,6 +201,10 @@ export default function App() {
   const cats = useMemo(() => categoryBreakdown(filtered), [filtered]);
   const nw = useMemo(() => needWantSplit(filtered), [filtered]);
   const merchants = useMemo(() => topMerchants(filtered, 5), [filtered]);
+  const budgets = useMemo(() => monthlyBudgets(data?.budgets, income), [data?.budgets, income]);
+  const budget = useMemo(() => budgetStatus(allTxns, budgets), [allTxns, budgets]);
+  const safeToSpend = useMemo(() => safeToSpendStatus(budget), [budget]);
+  const cashflow = useMemo(() => cashflowCalendarStatus(allTxns, budget, income), [allTxns, budget, income]);
 
   function toggleCat(c: string) {
     setActiveCats((prev) => {
@@ -238,12 +249,13 @@ export default function App() {
       </div>
 
       {/* KPIs */}
-      <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Spent" value={inr(kpis.totalSpend)} sub={RANGE_LABEL[range]} icon={<Wallet size={17} />} accent="violet" delay={0.02} />
         <KpiCard label="Transactions" value={String(kpis.txnCount)} sub={RANGE_LABEL[range]} icon={<Receipt size={17} />} accent="cyan" delay={0.06} />
         <KpiCard label="Savings rate" value={`${kpis.savingsRate}%`} sub={`on ${inr(income)} / mo`} icon={<PiggyBank size={17} />} accent="emerald" delay={0.1} />
         <KpiCard label="Top category" value={kpis.topCategory} sub={RANGE_LABEL[range]} icon={<Tag size={17} />} accent="amber" delay={0.14} />
         <KpiCard label="Needs share" value={`${kpis.needPct}%`} sub="of spend" icon={<Scale size={17} />} accent="rose" delay={0.18} />
+        <KpiCard label="Safe / day" value={inr(safeToSpend.dailySafeSpend)} sub={`${safeToSpend.daysRemaining} days left`} icon={<CalendarDays size={17} />} accent="cyan" delay={0.22} />
       </div>
 
       {/* Category filter */}
@@ -252,17 +264,29 @@ export default function App() {
       </div>
 
       {/* Trend + Insight */}
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
+      <div className="mb-5 grid gap-4 lg:grid-cols-4">
         <Card title="Spending over time" subtitle={RANGE_LABEL[range]} className="lg:col-span-2" delay={0.05}>
           <SpendTrendChart data={series} />
+        </Card>
+        <Card title="Safe to spend" subtitle="this month" delay={0.08}>
+          <SafeToSpend status={safeToSpend} />
         </Card>
         <InsightCard text={insightText} loading={generating} />
       </div>
 
+      <div className="mb-5">
+        <Card title="Cashflow calendar" subtitle="monthly runway" delay={0.06}>
+          <CashflowCalendar status={cashflow} />
+        </Card>
+      </div>
+
       {/* Breakdown row */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card title="By category" delay={0.05}>
           <CategoryDonut data={cats} />
+        </Card>
+        <Card title="Budget vs Actual" subtitle="this month" delay={0.1}>
+          <BudgetVsActual status={budget} />
         </Card>
         <Card title="Needs vs Wants" delay={0.1}>
           <NeedWantBar need={nw.need} want={nw.want} />
