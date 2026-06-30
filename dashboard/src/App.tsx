@@ -13,8 +13,10 @@ import {
   cashflowCalendarStatus,
   filterByRange,
   monthlyBudgets,
+  monthOverMonth,
   needWantSplit,
   safeToSpendStatus,
+  spendPaceSeries,
   spendSeries,
   topMerchants,
 } from "./lib/aggregate";
@@ -33,6 +35,8 @@ import { BudgetVsActual } from "./components/BudgetVsActual";
 import { SafeToSpend } from "./components/SafeToSpend";
 import { CashflowCalendar } from "./components/CashflowCalendar";
 import { InsightCard } from "./components/InsightCard";
+import { MonthComparison } from "./components/MonthComparison";
+import { SpendPaceChart } from "./components/SpendPaceChart";
 import { ActionBar } from "./components/ActionBar";
 import { QuickAddModal } from "./components/QuickAddModal";
 import { ConnectModal } from "./components/ConnectModal";
@@ -205,6 +209,8 @@ export default function App() {
   const budget = useMemo(() => budgetStatus(allTxns, budgets), [allTxns, budgets]);
   const safeToSpend = useMemo(() => safeToSpendStatus(budget), [budget]);
   const cashflow = useMemo(() => cashflowCalendarStatus(allTxns, budget, income), [allTxns, budget, income]);
+  const mom = useMemo(() => monthOverMonth(allTxns), [allTxns]);
+  const pace = useMemo(() => spendPaceSeries(allTxns), [allTxns]);
 
   function toggleCat(c: string) {
     setActiveCats((prev) => {
@@ -250,8 +256,20 @@ export default function App() {
 
       {/* KPIs */}
       <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-        <KpiCard label="Spent" value={inr(kpis.totalSpend)} sub={RANGE_LABEL[range]} icon={<Wallet size={17} />} accent="blue" delay={0.02} />
-        <KpiCard label="Transactions" value={String(kpis.txnCount)} sub={RANGE_LABEL[range]} icon={<Receipt size={17} />} accent="indigo" delay={0.06} />
+        <KpiCard
+          label="Spent" value={inr(kpis.totalSpend)} sub={RANGE_LABEL[range]}
+          icon={<Wallet size={17} />} accent="blue" delay={0.02}
+          trend={mom.prevMonthTotal > 0 ? {
+            label: `${mom.deltaPct > 0 ? "+" : ""}${mom.deltaPct}% vs ${mom.prevMonthLabel}`,
+            positive: mom.deltaPct <= 0,
+          } : undefined}
+        />
+        <KpiCard label="Transactions" value={String(kpis.txnCount)} sub={RANGE_LABEL[range]} icon={<Receipt size={17} />} accent="indigo" delay={0.06}
+          trend={mom.prevMonthCount > 0 ? {
+            label: `${mom.thisMonthCount - mom.prevMonthCount > 0 ? "+" : ""}${mom.thisMonthCount - mom.prevMonthCount} vs ${mom.prevMonthLabel}`,
+            positive: mom.thisMonthCount <= mom.prevMonthCount,
+          } : undefined}
+        />
         <KpiCard label="Savings rate" value={`${kpis.savingsRate}%`} sub={`on ${inr(income)} / mo`} icon={<PiggyBank size={17} />} accent="emerald" delay={0.1} />
         <KpiCard label="Top category" value={kpis.topCategory} sub={RANGE_LABEL[range]} icon={<Tag size={17} />} accent="amber" delay={0.14} />
         <KpiCard label="Needs share" value={`${kpis.needPct}%`} sub="of spend" icon={<Scale size={17} />} accent="rose" delay={0.18} />
@@ -261,6 +279,34 @@ export default function App() {
       {/* Category filter */}
       <div className="mb-5">
         <CategoryChips categories={presentCats} active={activeCats} onToggle={toggleCat} onClear={() => setActiveCats(new Set())} />
+      </div>
+
+      {/* Month Comparison + Spend Pace */}
+      <div className="mb-5 grid gap-4 lg:grid-cols-2">
+        <Card title="This month vs last month" subtitle={`${mom.thisMonthLabel} compared to ${mom.prevMonthLabel}`} delay={0.04}>
+          <MonthComparison status={mom} />
+        </Card>
+        <Card title="Spending pace" subtitle="cumulative spend — this month vs last month" delay={0.07}>
+          <SpendPaceChart
+            data={pace}
+            thisLabel={mom.thisMonthLabel}
+            prevLabel={mom.prevMonthLabel}
+            today={new Date().getDate()}
+          />
+          <div className="mt-3 flex items-center gap-5 text-[10px] font-medium text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-5 rounded-full bg-blue-500" />
+              {mom.thisMonthLabel} (this month)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-0.5 w-5 rounded-full bg-slate-400"
+                style={{ background: "repeating-linear-gradient(90deg, rgb(148 163 184) 0 4px, transparent 4px 7px)" }}
+              />
+              {mom.prevMonthLabel} (last month)
+            </span>
+          </div>
+        </Card>
       </div>
 
       {/* Trend + Insight */}

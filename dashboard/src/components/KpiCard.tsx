@@ -18,6 +18,7 @@ export function KpiCard({
   icon,
   accent = "blue",
   delay = 0,
+  trend,
 }: {
   label: string;
   value: string;
@@ -25,6 +26,8 @@ export function KpiCard({
   icon: ReactNode;
   accent?: keyof typeof ACCENTS;
   delay?: number;
+  /** trend.label e.g. "+8%" or "−12%", trend.positive = green, false = red */
+  trend?: { label: string; positive: boolean };
 }) {
   const a = ACCENTS[accent] ?? ACCENTS.blue;
   return (
@@ -48,9 +51,22 @@ export function KpiCard({
       <div className="mt-3 text-[1.75rem] font-extrabold leading-none tracking-tight text-slate-900 dark:text-white">
         {value}
       </div>
-      {sub && (
-        <div className="mt-1.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">{sub}</div>
-      )}
+      <div className="mt-1.5 flex items-center gap-2">
+        {sub && (
+          <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{sub}</span>
+        )}
+        {trend && (
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+              trend.positive
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            {trend.label}
+          </span>
+        )}
+      </div>
     </motion.div>
   );
 }

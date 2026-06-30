@@ -294,6 +294,121 @@ export function needWantSplit(txns: Txn[]): { need: number; want: number } {
   return { need, want };
 }
 
+// ── Month-over-Month ──────────────────────────────────────────────────────────
+
+export interface MoMCategory {
+  category: string;
+  thisMonth: number;
+  prevMonth: number;
+  delta: number;
+  deltaPct: number;
+}
+
+export interface MoMStatus {
+  thisMonthTotal: number;
+  prevMonthTotal: number;
+  delta: number;
+  deltaPct: number;
+  thisMonthCount: number;
+  prevMonthCount: number;
+  categories: MoMCategory[];
+  thisMonthLabel: string;
+  prevMonthLabel: string;
+}
+
+export function monthOverMonth(txns: Txn[], now = new Date()): MoMStatus {
+  const thisYear = now.getFullYear();
+  const thisMonthIdx = now.getMonth();
+  const prevYear = thisMonthIdx === 0 ? thisYear - 1 : thisYear;
+  const prevMonthIdx = thisMonthIdx === 0 ? 11 : thisMonthIdx - 1;
+
+  const thisStart = new Date(thisYear, thisMonthIdx, 1).getTime();
+  const thisEnd = new Date(thisYear, thisMonthIdx + 1, 0, 23, 59, 59, 999).getTime();
+  const prevStart = new Date(prevYear, prevMonthIdx, 1).getTime();
+  const prevEnd = new Date(prevYear, prevMonthIdx + 1, 0, 23, 59, 59, 999).getTime();
+
+  const thisTxns = txns.filter((t) => { const ms = parseDate(t.date).getTime(); return !isNaN(ms) && ms >= thisStart && ms <= thisEnd; });
+  const prevTxns = txns.filter((t) => { const ms = parseDate(t.date).getTime(); return !isNaN(ms) && ms >= prevStart && ms <= prevEnd; });
+
+  const thisTotal = sum(thisTxns);
+  const prevTotal = sum(prevTxns);
+  const delta = thisTotal - prevTotal;
+  const deltaPct = prevTotal > 0 ? Math.round((delta / prevTotal) * 100) : 0;
+
+  const thisByCat = new Map(categoryBreakdown(thisTxns).map((c) => [c.category, c.amount]));
+  const prevByCat = new Map(categoryBreakdown(prevTxns).map((c) => [c.category, c.amount]));
+  const allCats = new Set([...thisByCat.keys(), ...prevByCat.keys()]);
+
+  const categories: MoMCategory[] = [...allCats]
+    .map((category) => {
+      const thisMonth = thisByCat.get(category) ?? 0;
+      const prevMonth = prevByCat.get(category) ?? 0;
+      const d = thisMonth - prevMonth;
+      const dp = prevMonth > 0 ? Math.round((d / prevMonth) * 100) : thisMonth > 0 ? 100 : 0;
+      return { category, thisMonth, prevMonth, delta: d, deltaPct: dp };
+    })
+    .sort((a, b) => b.thisMonth - a.thisMonth);
+
+  return {
+    thisMonthTotal: thisTotal,
+    prevMonthTotal: prevTotal,
+    delta,
+    deltaPct,
+    thisMonthCount: thisTxns.length,
+    prevMonthCount: prevTxns.length,
+    categories,
+    thisMonthLabel: new Date(thisYear, thisMonthIdx, 1).toLocaleDateString("en-IN", { month: "short" }),
+    prevMonthLabel: new Date(prevYear, prevMonthIdx, 1).toLocaleDateString("en-IN", { month: "short" }),
+  };
+}
+
+// ── Spend Pace (cumulative day-by-day) ───────────────────────────────────────
+
+export interface PacePoint {
+  day: number;
+  thisMonth: number | null; // null for days beyond today
+  prevMonth: number;
+}
+
+export function spendPaceSeries(txns: Txn[], now = new Date()): PacePoint[] {
+  const thisYear = now.getFullYear();
+  const thisMonthIdx = now.getMonth();
+  const prevYear = thisMonthIdx === 0 ? thisYear - 1 : thisYear;
+  const prevMonthIdx = thisMonthIdx === 0 ? 11 : thisMonthIdx - 1;
+  const daysInPrevMonth = new Date(thisYear, thisMonthIdx, 0).getDate();
+  const today = now.getDate();
+
+  const thisSpend = new Map<number, number>();
+  const prevSpend = new Map<number, number>();
+
+  for (const t of txns) {
+    const d = parseDate(t.date);
+    if (isNaN(d.getTime())) continue;
+    if (d.getFullYear() === thisYear && d.getMonth() === thisMonthIdx) {
+      const day = d.getDate();
+      thisSpend.set(day, (thisSpend.get(day) ?? 0) + (t.amount || 0));
+    } else if (d.getFullYear() === prevYear && d.getMonth() === prevMonthIdx) {
+      const day = d.getDate();
+      prevSpend.set(day, (prevSpend.get(day) ?? 0) + (t.amount || 0));
+    }
+  }
+
+  const points: PacePoint[] = [];
+  let thisCum = 0, prevCum = 0;
+  for (let day = 1; day <= daysInPrevMonth; day++) {
+    prevCum += prevSpend.get(day) ?? 0;
+    if (day <= today) {
+      thisCum += thisSpend.get(day) ?? 0;
+      points.push({ day, thisMonth: thisCum, prevMonth: prevCum });
+    } else {
+      points.push({ day, thisMonth: null, prevMonth: prevCum });
+    }
+  }
+  return points;
+}
+
+// ── Top Merchants ─────────────────────────────────────────────────────────────
+
 export function topMerchants(txns: Txn[], n = 5): CatSlice[] {
   const m = new Map<string, number>();
   for (const t of txns) {
