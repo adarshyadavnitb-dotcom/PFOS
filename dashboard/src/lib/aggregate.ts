@@ -407,6 +407,130 @@ export function spendPaceSeries(txns: Txn[], now = new Date()): PacePoint[] {
   return points;
 }
 
+// ── Category Trend (last N months, stacked) ──────────────────────────────────
+
+export interface CategoryTrendPoint {
+  month: string;
+  sort: number;
+  [category: string]: number | string;
+}
+
+export interface CategoryTrendData {
+  points: CategoryTrendPoint[];
+  topCategories: string[];
+}
+
+export function categoryTrend(txns: Txn[], numMonths = 6, now = new Date()): CategoryTrendData {
+  // Build map: "YYYY-M" → { category → amount }
+  const monthMap = new Map<string, { label: string; sort: number; cats: Map<string, number> }>();
+
+  for (let i = numMonths - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+    monthMap.set(key, { label, sort: d.getFullYear() * 12 + d.getMonth(), cats: new Map() });
+  }
+
+  for (const t of txns) {
+    const d = parseDate(t.date);
+    if (isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const entry = monthMap.get(key);
+    if (!entry) continue;
+    const cat = t.category || "Other";
+    entry.cats.set(cat, (entry.cats.get(cat) ?? 0) + (t.amount || 0));
+  }
+
+  // Find top 5 categories by total spend across all months
+  const totals = new Map<string, number>();
+  for (const { cats } of monthMap.values()) {
+    for (const [cat, amt] of cats) totals.set(cat, (totals.get(cat) ?? 0) + amt);
+  }
+  const topCategories = [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cat]) => cat);
+
+  const points: CategoryTrendPoint[] = [...monthMap.values()]
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ label, sort, cats }) => {
+      const pt: CategoryTrendPoint = { month: label, sort };
+      for (const cat of topCategories) pt[cat] = cats.get(cat) ?? 0;
+      return pt;
+    });
+
+  return { points, topCategories };
+}
+
+// ── Day-of-Week Pattern ───────────────────────────────────────────────────────
+
+export interface DowPoint {
+  day: string;
+  dayIndex: number;
+  total: number;
+  count: number;
+  avg: number;
+}
+
+export function dayOfWeekPattern(txns: Txn[], numMonths = 3, now = new Date()): DowPoint[] {
+  const cutoff = new Date(now.getFullYear(), now.getMonth() - numMonths, 1).getTime();
+  const totals = new Array(7).fill(0);
+  const counts = new Array(7).fill(0);
+
+  for (const t of txns) {
+    const d = parseDate(t.date);
+    if (isNaN(d.getTime()) || d.getTime() < cutoff) continue;
+    const dow = d.getDay(); // 0=Sun
+    totals[dow] += t.amount || 0;
+    counts[dow]++;
+  }
+
+  // Return Mon–Sun order
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon first
+  return ORDER.map((i) => ({
+    day: DAYS[i],
+    dayIndex: i,
+    total: Math.round(totals[i]),
+    count: counts[i],
+    avg: counts[i] > 0 ? Math.round(totals[i] / counts[i]) : 0,
+  }));
+}
+
+// ── Monthly Savings Trend ─────────────────────────────────────────────────────
+
+export interface MonthlySavingsPoint {
+  month: string;
+  sort: number;
+  spend: number;
+  savings: number;
+  savingsRate: number;
+}
+
+export function monthlySavingsTrend(txns: Txn[], income: number, numMonths = 6, now = new Date()): MonthlySavingsPoint[] {
+  const points: MonthlySavingsPoint[] = [];
+
+  for (let i = numMonths - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const start = d.getTime();
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    const spend = txns
+      .filter((t) => { const ms = parseDate(t.date).getTime(); return !isNaN(ms) && ms >= start && ms <= end; })
+      .reduce((s, t) => s + (t.amount || 0), 0);
+    const savings = Math.max(income - spend, 0);
+    const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
+    points.push({
+      month: d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
+      sort: d.getFullYear() * 12 + d.getMonth(),
+      spend: Math.round(spend),
+      savings,
+      savingsRate,
+    });
+  }
+
+  return points;
+}
+
 // ── Top Merchants ─────────────────────────────────────────────────────────────
 
 export function topMerchants(txns: Txn[], n = 5): CatSlice[] {

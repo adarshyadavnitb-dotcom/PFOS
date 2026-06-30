@@ -8,12 +8,15 @@ import { addExpense, ApiError, fetchData, generateInsight } from "./api";
 import {
   applyCategoryFilter,
   categoryBreakdown,
+  categoryTrend,
   computeKpis,
   budgetStatus,
   cashflowCalendarStatus,
+  dayOfWeekPattern,
   filterByRange,
   monthlyBudgets,
   monthOverMonth,
+  monthlySavingsTrend,
   needWantSplit,
   safeToSpendStatus,
   spendPaceSeries,
@@ -37,6 +40,9 @@ import { CashflowCalendar } from "./components/CashflowCalendar";
 import { InsightCard } from "./components/InsightCard";
 import { MonthComparison } from "./components/MonthComparison";
 import { SpendPaceChart } from "./components/SpendPaceChart";
+import { CategoryTrendChart } from "./components/CategoryTrendChart";
+import { DayOfWeekHeatmap } from "./components/DayOfWeekHeatmap";
+import { SavingsTrendChart } from "./components/SavingsTrendChart";
 import { ActionBar } from "./components/ActionBar";
 import { QuickAddModal } from "./components/QuickAddModal";
 import { ConnectModal } from "./components/ConnectModal";
@@ -211,6 +217,9 @@ export default function App() {
   const cashflow = useMemo(() => cashflowCalendarStatus(allTxns, budget, income), [allTxns, budget, income]);
   const mom = useMemo(() => monthOverMonth(allTxns), [allTxns]);
   const pace = useMemo(() => spendPaceSeries(allTxns), [allTxns]);
+  const catTrend = useMemo(() => categoryTrend(allTxns), [allTxns]);
+  const dowPattern = useMemo(() => dayOfWeekPattern(allTxns), [allTxns]);
+  const savingsTrend = useMemo(() => monthlySavingsTrend(allTxns, income), [allTxns, income]);
 
   function toggleCat(c: string) {
     setActiveCats((prev) => {
@@ -327,7 +336,7 @@ export default function App() {
       </div>
 
       {/* Breakdown row */}
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card title="By category" delay={0.05}>
           <CategoryDonut data={cats} />
         </Card>
@@ -339,6 +348,27 @@ export default function App() {
         </Card>
         <Card title="Top merchants" delay={0.15}>
           <TopMerchants data={merchants} />
+        </Card>
+      </div>
+
+      {/* Trend analysis row */}
+      <div className="mb-5 grid gap-4 lg:grid-cols-3">
+        <Card title="Category trend" subtitle="last 6 months · stacked by category" delay={0.05} className="lg:col-span-1">
+          <CategoryTrendChart data={catTrend} />
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {catTrend.topCategories.map((cat, i) => (
+              <span key={cat} className="flex items-center gap-1 text-[10px] text-slate-400">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ["#f59e0b","#06b6d4","#22c55e","#ec4899","#8b5cf6"][i] }} />
+                {cat}
+              </span>
+            ))}
+          </div>
+        </Card>
+        <Card title="Day-of-week pattern" subtitle="which days drain your budget most" delay={0.08}>
+          <DayOfWeekHeatmap data={dowPattern} />
+        </Card>
+        <Card title="Savings trend" subtitle="last 6 months" delay={0.11}>
+          <SavingsTrendChart data={savingsTrend} />
         </Card>
       </div>
 
