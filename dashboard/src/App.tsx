@@ -352,22 +352,14 @@ export default function App() {
       </div>
 
       {/* Trend analysis row */}
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
-        <Card title="Category trend" subtitle="last 6 months · stacked by category" delay={0.05} className="lg:col-span-1">
+      <div className="mb-5 grid gap-4 lg:grid-cols-5">
+        <Card title="Category trend" subtitle="top 5 categories · last 6 months" delay={0.05} className="lg:col-span-2">
           <CategoryTrendChart data={catTrend} />
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-            {catTrend.topCategories.map((cat, i) => (
-              <span key={cat} className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ["#f59e0b","#06b6d4","#22c55e","#ec4899","#8b5cf6"][i] }} />
-                {cat}
-              </span>
-            ))}
-          </div>
         </Card>
-        <Card title="Day-of-week pattern" subtitle="which days drain your budget most" delay={0.08}>
+        <Card title="Spending by day" subtitle="which days cost you most" delay={0.08} className="lg:col-span-2">
           <DayOfWeekHeatmap data={dowPattern} />
         </Card>
-        <Card title="Savings trend" subtitle="last 6 months" delay={0.11}>
+        <Card title="Savings trend" subtitle="last 6 months" delay={0.11} className="lg:col-span-1">
           <SavingsTrendChart data={savingsTrend} />
         </Card>
       </div>
