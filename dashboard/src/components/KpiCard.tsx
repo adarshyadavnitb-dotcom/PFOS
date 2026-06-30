@@ -34,8 +34,9 @@ export function KpiCard({
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="glass glass-hover relative overflow-hidden p-5"
+      whileHover={{ y: -4, scale: 1.015, transition: { type: "spring", stiffness: 380, damping: 26 } }}
+      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
+      className="glass glass-hover relative overflow-hidden p-5 cursor-default"
     >
       {/* Accent bar */}
       <div className={`absolute inset-x-0 top-0 h-[2.5px] rounded-t-[22px] ${a.bar}`} />

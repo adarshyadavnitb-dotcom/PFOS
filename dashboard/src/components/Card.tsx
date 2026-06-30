@@ -16,15 +16,21 @@ export function Card({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
+      viewport={{ once: true, amount: 0.08 }}
+      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
       className={`glass glass-hover p-5 ${className}`}
     >
       {title && (
         <div className="mb-4">
-          <h3 className="text-[15px] font-semibold leading-snug text-slate-800 dark:text-slate-100">{title}</h3>
-          {subtitle && <p className="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">{subtitle}</p>}
+          <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-slate-800 dark:text-slate-100">
+            {title}
+          </h3>
+          {subtitle && (
+            <p className="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">{subtitle}</p>
+          )}
         </div>
       )}
       {children}

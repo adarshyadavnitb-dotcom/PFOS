@@ -531,6 +531,175 @@ export function monthlySavingsTrend(txns: Txn[], income: number, numMonths = 6, 
   return points;
 }
 
+// ── Anomaly Detection ─────────────────────────────────────────────────────────
+
+export interface Anomaly {
+  category: string;
+  recentSpend: number;
+  baselineSpend: number;
+  ratio: number;
+  deltaAmount: number;
+}
+
+export function detectAnomalies(txns: Txn[], now = new Date()): Anomaly[] {
+  const WINDOW = 7 * 86400000;
+  const recentEnd = now.getTime();
+  const recentStart = recentEnd - WINDOW;
+
+  const recentBycat = new Map<string, number>();
+  const baselineByWeek: Map<string, number>[] = Array.from({ length: 4 }, () => new Map());
+
+  for (const t of txns) {
+    const ms = parseDate(t.date).getTime();
+    if (isNaN(ms)) continue;
+    const cat = t.category || "Other";
+    const amt = t.amount || 0;
+    if (ms >= recentStart && ms <= recentEnd) {
+      recentBycat.set(cat, (recentBycat.get(cat) ?? 0) + amt);
+    }
+    for (let w = 1; w <= 4; w++) {
+      const wEnd = recentEnd - w * WINDOW;
+      const wStart = wEnd - WINDOW;
+      if (ms >= wStart && ms <= wEnd) {
+        baselineByWeek[w - 1].set(cat, (baselineByWeek[w - 1].get(cat) ?? 0) + amt);
+      }
+    }
+  }
+
+  const anomalies: Anomaly[] = [];
+  for (const [cat, recent] of recentBycat) {
+    const baseline = baselineByWeek.map((m) => m.get(cat) ?? 0).reduce((a, b) => a + b, 0) / 4;
+    if (baseline < 200) continue;
+    const ratio = recent / baseline;
+    if (ratio >= 1.5 && recent > 400) {
+      anomalies.push({
+        category: cat,
+        recentSpend: Math.round(recent),
+        baselineSpend: Math.round(baseline),
+        ratio: Math.round(ratio * 10) / 10,
+        deltaAmount: Math.round(recent - baseline),
+      });
+    }
+  }
+  return anomalies.sort((a, b) => b.ratio - a.ratio).slice(0, 4);
+}
+
+// ── Recurring Expense Detection ───────────────────────────────────────────────
+
+export interface RecurringItem {
+  merchant: string;
+  category: string;
+  avgAmount: number;
+  monthsSeen: number;
+  lastDate: string;
+}
+
+export function detectRecurring(txns: Txn[], numMonths = 3, now = new Date()): RecurringItem[] {
+  const merchantData = new Map<string, {
+    category: string;
+    monthKeys: Set<string>;
+    amounts: number[];
+    lastDate: string;
+  }>();
+
+  for (let i = 0; i < numMonths; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mk = `${d.getFullYear()}-${d.getMonth()}`;
+    for (const t of txns) {
+      const td = parseDate(t.date);
+      if (isNaN(td.getTime())) continue;
+      if (td.getFullYear() !== d.getFullYear() || td.getMonth() !== d.getMonth()) continue;
+      const key = (t.merchant || "Unknown").trim();
+      if (!merchantData.has(key)) {
+        merchantData.set(key, { category: t.category, monthKeys: new Set(), amounts: [], lastDate: t.date });
+      }
+      const entry = merchantData.get(key)!;
+      entry.monthKeys.add(mk);
+      entry.amounts.push(t.amount || 0);
+      if (parseDate(t.date).getTime() > parseDate(entry.lastDate).getTime()) {
+        entry.lastDate = t.date;
+      }
+    }
+  }
+
+  return [...merchantData.entries()]
+    .filter(([_, v]) => v.monthKeys.size >= 2)
+    .map(([merchant, v]) => ({
+      merchant,
+      category: v.category,
+      avgAmount: Math.round(v.amounts.reduce((a, b) => a + b, 0) / v.amounts.length),
+      monthsSeen: v.monthKeys.size,
+      lastDate: v.lastDate,
+    }))
+    .sort((a, b) => b.avgAmount - a.avgAmount)
+    .slice(0, 8);
+}
+
+// ── Top Transactions ──────────────────────────────────────────────────────────
+
+export function topTransactions(txns: Txn[], n = 8, now = new Date()): Txn[] {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+  return txns
+    .filter((t) => { const ms = parseDate(t.date).getTime(); return !isNaN(ms) && ms >= start && ms <= end; })
+    .sort((a, b) => (b.amount || 0) - (a.amount || 0))
+    .slice(0, n);
+}
+
+// ── Category Projections ──────────────────────────────────────────────────────
+
+export interface CategoryProjection {
+  category: string;
+  budget: number;
+  actual: number;
+  projected: number;
+  projectedDelta: number;
+  onTrack: boolean;
+  paceVsBudget: number;
+  usedPct: number;
+}
+
+export function categoryProjections(txns: Txn[], budgets: Budget[], now = new Date()): CategoryProjection[] {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const elapsedDays = Math.max(now.getDate(), 1);
+
+  const monthTxns = txns.filter((t) => {
+    const ms = parseDate(t.date).getTime();
+    return !isNaN(ms) && ms >= monthStart && ms <= monthEnd;
+  });
+
+  const actualBycat = new Map(categoryBreakdown(monthTxns).map((c) => [c.category, c.amount]));
+  const budgetBycat = new Map<string, number>();
+  for (const b of budgets) budgetBycat.set(b.category, (budgetBycat.get(b.category) ?? 0) + b.monthly_limit);
+
+  const categories = new Set([...budgetBycat.keys(), ...actualBycat.keys()]);
+  return [...categories]
+    .filter((cat) => (budgetBycat.get(cat) ?? 0) > 0)
+    .map((cat) => {
+      const budget = budgetBycat.get(cat) ?? 0;
+      const actual = actualBycat.get(cat) ?? 0;
+      const projected = Math.round((actual / elapsedDays) * daysInMonth);
+      const projectedDelta = projected - budget;
+      return {
+        category: cat,
+        budget,
+        actual,
+        projected,
+        projectedDelta,
+        onTrack: projected <= budget,
+        paceVsBudget: budget > 0 ? Math.round((projected / budget) * 100) : 0,
+        usedPct: budget > 0 ? Math.round((actual / budget) * 100) : 0,
+      };
+    })
+    .sort((a, b) => {
+      if (!a.onTrack && b.onTrack) return -1;
+      if (a.onTrack && !b.onTrack) return 1;
+      return b.paceVsBudget - a.paceVsBudget;
+    });
+}
+
 // ── Top Merchants ─────────────────────────────────────────────────────────────
 
 export function topMerchants(txns: Txn[], n = 5): CatSlice[] {

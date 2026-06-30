@@ -8,11 +8,14 @@ import { addExpense, ApiError, fetchData, generateInsight } from "./api";
 import {
   applyCategoryFilter,
   categoryBreakdown,
+  categoryProjections,
   categoryTrend,
   computeKpis,
   budgetStatus,
   cashflowCalendarStatus,
   dayOfWeekPattern,
+  detectAnomalies,
+  detectRecurring,
   filterByRange,
   monthlyBudgets,
   monthOverMonth,
@@ -22,6 +25,7 @@ import {
   spendPaceSeries,
   spendSeries,
   topMerchants,
+  topTransactions,
 } from "./lib/aggregate";
 import { inr } from "./lib/format";
 
@@ -43,6 +47,11 @@ import { SpendPaceChart } from "./components/SpendPaceChart";
 import { CategoryTrendChart } from "./components/CategoryTrendChart";
 import { DayOfWeekHeatmap } from "./components/DayOfWeekHeatmap";
 import { SavingsTrendChart } from "./components/SavingsTrendChart";
+import { AnomalyAlerts } from "./components/AnomalyAlerts";
+import { IncomeRings } from "./components/IncomeRings";
+import { RecurringTracker } from "./components/RecurringTracker";
+import { TopTransactions } from "./components/TopTransactions";
+import { CategoryProjections } from "./components/CategoryProjections";
 import { ActionBar } from "./components/ActionBar";
 import { QuickAddModal } from "./components/QuickAddModal";
 import { ConnectModal } from "./components/ConnectModal";
@@ -220,6 +229,14 @@ export default function App() {
   const catTrend = useMemo(() => categoryTrend(allTxns), [allTxns]);
   const dowPattern = useMemo(() => dayOfWeekPattern(allTxns), [allTxns]);
   const savingsTrend = useMemo(() => monthlySavingsTrend(allTxns, income), [allTxns, income]);
+  const anomalies = useMemo(() => detectAnomalies(allTxns), [allTxns]);
+  const recurring = useMemo(() => detectRecurring(allTxns), [allTxns]);
+  const topTxns = useMemo(() => topTransactions(allTxns), [allTxns]);
+  const catProjections = useMemo(() => categoryProjections(allTxns, budgets), [allTxns, budgets]);
+  const monthCats = useMemo(() => {
+    const monthTxns = filterByRange(allTxns, "month");
+    return categoryBreakdown(monthTxns).slice(0, 5);
+  }, [allTxns]);
 
   function toggleCat(c: string) {
     setActiveCats((prev) => {
@@ -285,6 +302,9 @@ export default function App() {
         <KpiCard label="Safe / day" value={inr(safeToSpend.dailySafeSpend)} sub={`${safeToSpend.daysRemaining} days left`} icon={<CalendarDays size={17} />} accent="emerald" delay={0.22} />
       </div>
 
+      {/* Anomaly alerts */}
+      <AnomalyAlerts anomalies={anomalies} />
+
       {/* Category filter */}
       <div className="mb-5">
         <CategoryChips categories={presentCats} active={activeCats} onToggle={toggleCat} onClear={() => setActiveCats(new Set())} />
@@ -348,6 +368,26 @@ export default function App() {
         </Card>
         <Card title="Top merchants" delay={0.15}>
           <TopMerchants data={merchants} />
+        </Card>
+      </div>
+
+      {/* Intelligence row: Income rings + Recurring + Top transactions */}
+      <div className="mb-5 grid gap-4 lg:grid-cols-3">
+        <Card title="Income allocation" subtitle="where your income goes this month" delay={0.04}>
+          <IncomeRings cats={monthCats} income={income} />
+        </Card>
+        <Card title="Recurring expenses" subtitle="merchants active 2+ months in a row" delay={0.07}>
+          <RecurringTracker data={recurring} />
+        </Card>
+        <Card title="Biggest transactions" subtitle="top 8 by amount this month" delay={0.1}>
+          <TopTransactions txns={topTxns} />
+        </Card>
+      </div>
+
+      {/* Category projections */}
+      <div className="mb-5">
+        <Card title="Month-end projections" subtitle="on current daily pace — white bar = budget limit" delay={0.05}>
+          <CategoryProjections data={catProjections} />
         </Card>
       </div>
 
